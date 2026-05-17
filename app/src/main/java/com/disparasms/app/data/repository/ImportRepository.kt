@@ -17,7 +17,8 @@ data class ImportResult(
     val duplicates: Int = 0,
     val invalidPhones: Int = 0,
     val totalFound: Int = 0,
-    val errors: List<String> = emptyList()
+    val errors: List<String> = emptyList(),
+    val contacts: List<ContactEntity> = emptyList()
 )
 
 data class ImportPreview(
@@ -28,8 +29,32 @@ data class ImportPreview(
 
 @Singleton
 class ImportRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val contactRepository: ContactRepository
 ) {
+    companion object {
+        private val PHONE_ALIASES = listOf(
+            "phone", "telefone", "celular", "movel", "mobile",
+            "contacto", "numero", "número",
+            "cell", "whatsapp"
+        )
+        private val NAME_ALIASES = listOf(
+            "name", "nome", "fullname", "nomecompleto",
+            "full_name", "nomes", "names",
+            "nome_completo"
+        )
+        private val FIRST_NAME_ALIASES = listOf(
+            "firstname", "first_name", "primeironome",
+            "primeiro_nome", "pnome",
+            "givenname", "nome_proprio"
+        )
+        private val LAST_NAME_ALIASES = listOf(
+            "lastname", "last_name", "sobrenome",
+            "ultimonome", "ultimo_nome",
+            "unome", "surname",
+            "apelido"
+        )
+    }
 
     fun previewExcel(uri: Uri): ImportPreview? {
         return try {
@@ -96,16 +121,22 @@ class ImportRepository @Inject constructor(
         )
     }
 
-    fun importFromUri(
+    suspend fun importFromUri(
         uri: Uri,
         groupId: Long?,
-        columnMapping: Map<String, String>,
+        columnMapping: Map<String, String> = emptyMap(),
         hasHeader: Boolean = true
     ): ImportResult {
         return try {
             val inputStream = context.contentResolver.openInputStream(uri)
             inputStream?.use { stream ->
-                parseAndImport(stream, uri.toString(), groupId, columnMapping, hasHeader)
+                val result = parseAndImport(stream, uri.toString(), groupId, columnMapping, hasHeader)
+                if (result.errors.isEmpty() && result.contacts.isNotEmpty()) {
+                    val (imported, skipped) = contactRepository.importContacts(result.contacts)
+                    result.copy(imported = imported, skipped = result.skipped + skipped)
+                } else {
+                    result
+                }
             } ?: ImportResult(errors = listOf("Could not open file"))
         } catch (e: Exception) {
             ImportResult(errors = listOf("Error: ${e.message}"))
@@ -171,17 +202,20 @@ class ImportRepository @Inject constructor(
         mapping: Map<String, String>,
         groupId: Long?
     ): ImportResult {
-        val phoneColumnIdx = findColumnIndex(header, mapping, "phone")
-        val firstNameColumnIdx = findColumnIndex(header, mapping, "first_name")
-        val lastNameColumnIdx = findColumnIndex(header, mapping, "last_name")
-        val nameColumnIdx = findColumnIndex(header, mapping, "name")
+        val resolvedMapping = if (mapping.isEmpty()) autoDetectColumns(header) else mapping
+
+        val phoneColumnIdx = findColumnIndex(header, resolvedMapping, "phone")
+        val firstNameColumnIdx = findColumnIndex(header, resolvedMapping, "first_name")
+        val lastNameColumnIdx = findColumnIndex(header, resolvedMapping, "last_name")
+        val nameColumnIdx = findColumnIndex(header, resolvedMapping, "name")
 
         if (phoneColumnIdx == -1) {
-            return ImportResult(errors = listOf("Phone column not found in mapping"))
+            return ImportResult(errors = listOf(
+                "Coluna de telefone não encontrada. " +
+                "Verifique se o ficheiro tem uma coluna com nome 'Telefone', 'Celular', 'Phone' etc."
+            ))
         }
 
-        var imported = 0
-        var skipped = 0
         var invalidPhones = 0
         val seenPhones = mutableSetOf<String>()
 
@@ -197,7 +231,6 @@ class ImportRepository @Inject constructor(
             }
 
             if (phone in seenPhones) {
-                skipped++
                 return@mapNotNull null
             }
             seenPhones.add(phone)
@@ -232,10 +265,42 @@ class ImportRepository @Inject constructor(
 
         return ImportResult(
             totalFound = rows.size,
-            imported = contacts.size,
-            skipped = skipped,
-            invalidPhones = invalidPhones
+            imported = 0,
+            skipped = rows.size - contacts.size - invalidPhones,
+            invalidPhones = invalidPhones,
+            contacts = contacts
         )
+    }
+
+    private fun autoDetectColumns(header: List<String>): Map<String, String> {
+        val mapping = mutableMapOf<String, String>()
+
+        for (col in header) {
+            val colLower = col.trim().lowercase().replace(" ", "_").replace("-", "_")
+
+            when {
+                PHONE_ALIASES.any { it == colLower || colLower.contains(it) } -> {
+                    mapping["phone"] = col
+                }
+                LAST_NAME_ALIASES.any { it == colLower || colLower.contains(it) } -> {
+                    mapping["last_name"] = col
+                }
+                FIRST_NAME_ALIASES.any { it == colLower || colLower.contains(it) } -> {
+                    if ("name" !in mapping) {
+                        mapping["name"] = col
+                    } else {
+                        mapping["first_name"] = col
+                    }
+                }
+                NAME_ALIASES.any { it == colLower || colLower.contains(it) } -> {
+                    if ("name" !in mapping && "first_name" !in mapping) {
+                        mapping["name"] = col
+                    }
+                }
+            }
+        }
+
+        return mapping
     }
 
     private fun findColumnIndex(header: List<String>, mapping: Map<String, String>, field: String): Int {
