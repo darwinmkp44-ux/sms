@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,27 +39,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
+import com.disparasms.app.sms.SimInfo
+import com.disparasms.app.sms.SmsSender
 import com.disparasms.app.ui.theme.CornerRadius
 import com.disparasms.app.ui.theme.Spacing
-
-data class SimOption(
-    val id: Int,
-    val name: String,
-    val carrier: String,
-    val isAvailable: Boolean = true
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SimManagementScreen(navController: NavController) {
-    var selectedSimId by remember { mutableStateOf(0) }
-    val sims = listOf(
-        SimOption(0, "SIM 1", "Operadora A"),
-        SimOption(1, "SIM 2", "Operadora B")
-    )
+    val context = LocalContext.current
+    val smsSender = remember { SmsSender(context) }
+    var selectedSimSlot by remember { mutableStateOf(0) }
+    var simSlots by remember { mutableStateOf<List<SimInfo>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        simSlots = smsSender.getAvailableSimSlots()
+        if (simSlots.isEmpty()) {
+            simSlots = listOf(
+                SimInfo(0, 0, "SIM 1", "SIM 1"),
+                SimInfo(1, 0, "SIM 2", "SIM 2")
+            )
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -94,20 +101,20 @@ fun SimManagementScreen(navController: NavController) {
                 Spacer(Modifier.height(Spacing.md))
             }
 
-            items(sims.size) { index ->
-                val sim = sims[index]
+            items(simSlots.size) { index ->
+                val sim = simSlots[index]
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { selectedSimId = sim.id },
+                        .clickable { selectedSimSlot = sim.slotIndex },
                     shape = RoundedCornerShape(CornerRadius.md),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (selectedSimId == sim.id)
+                        containerColor = if (selectedSimSlot == sim.slotIndex)
                             MaterialTheme.colorScheme.primaryContainer
                         else MaterialTheme.colorScheme.surface
                     ),
                     elevation = CardDefaults.cardElevation(
-                        defaultElevation = if (selectedSimId == sim.id) 2.dp else 0.dp
+                        defaultElevation = if (selectedSimSlot == sim.slotIndex) 2.dp else 0.dp
                     )
                 ) {
                     Row(
@@ -121,7 +128,7 @@ fun SimManagementScreen(navController: NavController) {
                                 .size(48.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (selectedSimId == sim.id)
+                                    if (selectedSimSlot == sim.slotIndex)
                                         MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                                     else MaterialTheme.colorScheme.surfaceVariant
                                 ),
@@ -130,7 +137,7 @@ fun SimManagementScreen(navController: NavController) {
                             Icon(
                                 imageVector = Icons.Default.SimCard,
                                 contentDescription = null,
-                                tint = if (selectedSimId == sim.id)
+                                tint = if (selectedSimSlot == sim.slotIndex)
                                     MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(24.dp)
@@ -139,17 +146,17 @@ fun SimManagementScreen(navController: NavController) {
                         Spacer(Modifier.width(Spacing.md))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = sim.name,
+                                text = sim.displayName,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = sim.carrier,
+                                text = sim.carrierName,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        if (selectedSimId == sim.id) {
+                        if (selectedSimSlot == sim.slotIndex) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Seleccionado",

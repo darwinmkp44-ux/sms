@@ -65,4 +65,10 @@ interface ContactDao {
 
     @Query("SELECT * FROM contacts WHERE is_favorite = 1 ORDER BY full_name ASC")
     fun observeFavorites(): Flow<List<ContactEntity>>
+
+    @Query("UPDATE contacts SET group_id = :groupId WHERE id IN (:contactIds)")
+    suspend fun assignToGroup(contactIds: List<Long>, groupId: Long)
+
+    @Query("UPDATE contacts SET group_id = NULL WHERE id IN (:contactIds)")
+    suspend fun removeFromGroup(contactIds: List<Long>)
 }

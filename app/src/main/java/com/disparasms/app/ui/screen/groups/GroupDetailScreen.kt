@@ -16,12 +16,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,17 +41,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.disparasms.app.data.local.entity.ContactEntity
+import com.disparasms.app.di.DaoEntryPoint
 import com.disparasms.app.ui.components.EmptyState
 import com.disparasms.app.ui.components.ModernCard
 import com.disparasms.app.ui.theme.Spacing
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,12 +63,30 @@ fun GroupDetailScreen(
     viewModel: GroupsViewModel = hiltViewModel()
 ) {
     val scope = rememberCoroutineScope()
-    var showMenu by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val groupId = navController
         .currentBackStackEntry
         ?.arguments
         ?.getString("groupId")
         ?.toLongOrNull()
+
+    val contactRepository = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            DaoEntryPoint::class.java
+        ).contactRepository()
+    }
+
+    var contacts by remember { mutableStateOf<List<ContactEntity>>(emptyList()) }
+    var showMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(groupId) {
+        if (groupId != null) {
+            contactRepository.observeByGroup(groupId).collect { contactList ->
+                contacts = contactList
+            }
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -96,23 +117,17 @@ fun GroupDetailScreen(
                                 showMenu = false
                                 navController.navigate("groups/edit/$groupId")
                             },
-                            leadingIcon = {
-                                Icon(Icons.Default.Edit, contentDescription = null)
-                            }
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
                         )
                         DropdownMenuItem(
                             text = { Text("Duplicar") },
                             onClick = {
                                 showMenu = false
-                                scope.launch {
-                                    if (groupId != null) {
-                                        viewModel.duplicateGroup(groupId)
-                                    }
+                                if (groupId != null) {
+                                    viewModel.duplicateGroup(groupId)
                                 }
                             },
-                            leadingIcon = {
-                                Icon(Icons.Default.ContentCopy, contentDescription = null)
-                            }
+                            leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) }
                         )
                     }
                 }
@@ -124,37 +139,50 @@ fun GroupDetailScreen(
 
         if (groupId == null) {
             EmptyState(
-                icon = Icons.Default.SearchOff,
+                icon = Icons.Default.Person,
                 title = "Grupo não encontrado",
                 description = "O grupo que procura não existe"
             )
             return
         }
 
-        ContactList(groupId = groupId)
-    }
-}
-
-@Composable
-private fun ContactList(groupId: Long) {
-    val contacts = remember { mutableStateOf<List<ContactEntity>>(emptyList()) }
-
-    if (contacts.value.isEmpty()) {
-        EmptyState(
-            icon = Icons.Default.Person,
-            title = "Sem contactos",
-            description = "Este grupo ainda não tem contactos",
-            actionLabel = "Adicionar Contactos",
-            onAction = { }
-        )
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        // Add contacts button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(contacts.value, key = { it.id }) { contact ->
-                ContactListItem(contact = contact)
+            Text(
+                text = "${contacts.size} contactos",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            IconButton(onClick = {
+                navController.navigate("groups/$groupId/add-contacts")
+            }) {
+                Icon(Icons.Default.Add, contentDescription = "Adicionar contactos")
+            }
+        }
+
+        if (contacts.isEmpty()) {
+            EmptyState(
+                icon = Icons.Default.Person,
+                title = "Sem contactos",
+                description = "Adicione contactos a este grupo",
+                actionLabel = "Adicionar Contactos",
+                onAction = { navController.navigate("groups/$groupId/add-contacts") }
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(contacts, key = { it.id }) { contact ->
+                    ContactListItem(contact = contact)
+                }
             }
         }
     }
@@ -162,9 +190,7 @@ private fun ContactList(groupId: Long) {
 
 @Composable
 private fun ContactListItem(contact: ContactEntity) {
-    ModernCard(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    ModernCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -187,9 +213,11 @@ private fun ContactListItem(contact: ContactEntity) {
             Spacer(Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = contact.firstName ?: "Sem nome",
+                    text = contact.fullName ?: contact.firstName ?: "Sem nome",
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = contact.phone,

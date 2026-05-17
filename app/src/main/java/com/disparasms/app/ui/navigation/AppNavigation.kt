@@ -35,6 +35,7 @@ import androidx.navigation.navArgument
 import com.disparasms.app.ui.screen.home.HomeScreen
 import com.disparasms.app.ui.screen.groups.GroupsScreen
 import com.disparasms.app.ui.screen.groups.CreateGroupScreen
+import com.disparasms.app.ui.screen.groups.AddContactsToGroupScreen
 import com.disparasms.app.ui.screen.groups.EditGroupScreen
 import com.disparasms.app.ui.screen.groups.GroupDetailScreen
 import com.disparasms.app.ui.screen.campaign.CreateCampaignScreen
@@ -181,6 +182,9 @@ fun AppNavigation() {
             }
 
             // Import
+            composable(NavRoutes.AddContactsToGroup.route) {
+                AddContactsToGroupScreen(navController = navController)
+            }
             composable(NavRoutes.ImportContacts.route) {
                 ImportScreen(navController = navController)
             }

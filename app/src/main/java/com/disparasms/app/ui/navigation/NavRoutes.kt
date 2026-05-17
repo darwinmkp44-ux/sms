@@ -23,7 +23,9 @@ sealed class NavRoutes(val route: String) {
         fun createRoute(campaignId: Long) = "campaigns/$campaignId/logs"
     }
     data object ImportContacts : NavRoutes("import")
-    data object ImportPreview : NavRoutes("import/preview")
+    data object AddContactsToGroup : NavRoutes("groups/{groupId}/add-contacts") {
+        fun createRoute(groupId: Long) = "groups/$groupId/add-contacts"
+    }
     data object BackupRestore : NavRoutes("settings/backup")
     data object SimManagement : NavRoutes("settings/sim")
     data object About : NavRoutes("settings/about")
