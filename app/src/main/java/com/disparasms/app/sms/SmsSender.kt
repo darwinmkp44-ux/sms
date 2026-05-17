@@ -39,10 +39,12 @@ class SmsSender(private val context: Context) {
                 }
             }
             if (sims.isEmpty()) {
-                sims.add(SimInfo(0, 0, "SIM 1", "SIM 1"))
+                sims.add(SimInfo(0, 0, "Operadora A", "SIM 1"))
+                sims.add(SimInfo(1, 0, "Operadora B", "SIM 2"))
             }
         } catch (e: Exception) {
-            sims.add(SimInfo(0, 0, "SIM 1", "SIM 1"))
+            sims.add(SimInfo(0, 0, "Operadora A", "SIM 1"))
+            sims.add(SimInfo(1, 0, "Operadora B", "SIM 2"))
         }
         return sims
     }
