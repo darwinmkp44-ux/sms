@@ -37,22 +37,24 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     val uiState: StateFlow<HomeUiState> = combine(
-        campaignRepository.observeTotalSent().orZero(),
-        campaignRepository.observeTotalDelivered().orZero(),
-        campaignRepository.observeTotalFailed().orZero(),
-        campaignRepository.observeCount().catch { emit(0) },
-        groupRepository.observeCount().catch { emit(0) },
-        contactRepository.observeTotalCount().catch { emit(0) },
-        campaignRepository.observeAll().catch { emit(emptyList()) }
-    ) { sent, delivered, failed, campaigns, groups, contacts, allCampaigns ->
+        listOf(
+            campaignRepository.observeTotalSent().orZero(),
+            campaignRepository.observeTotalDelivered().orZero(),
+            campaignRepository.observeTotalFailed().orZero(),
+            campaignRepository.observeCount().catch { emit(0) },
+            groupRepository.observeCount().catch { emit(0) },
+            contactRepository.observeTotalCount().catch { emit(0) },
+            campaignRepository.observeAll().catch { emit(emptyList()) }
+        )
+    ) { array ->
         HomeUiState(
-            totalSent = sent,
-            totalDelivered = delivered,
-            totalFailed = failed,
-            totalCampaigns = campaigns,
-            totalGroups = groups,
-            totalContacts = contacts,
-            recentCampaigns = allCampaigns.take(5),
+            totalSent = array[0] as Long,
+            totalDelivered = array[1] as Long,
+            totalFailed = array[2] as Long,
+            totalCampaigns = array[3] as Int,
+            totalGroups = array[4] as Int,
+            totalContacts = array[5] as Int,
+            recentCampaigns = (array[6] as List<CampaignEntity>).take(5),
             isLoading = false
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())

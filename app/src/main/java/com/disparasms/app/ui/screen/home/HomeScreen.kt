@@ -18,7 +18,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.SendHorizontal
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -153,7 +152,7 @@ fun HomeScreen(
         if (state.recentCampaigns.isEmpty()) {
             item {
                 EmptyState(
-                    icon = Icons.Default.SendHorizontal,
+                    icon = Icons.Default.Send,
                     title = "Nenhuma campanha",
                     description = "Crie sua primeira campanha de SMS",
                     actionLabel = "Criar Campanha",

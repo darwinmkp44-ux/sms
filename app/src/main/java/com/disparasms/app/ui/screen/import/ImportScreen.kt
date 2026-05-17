@@ -40,6 +40,7 @@ import androidx.navigation.NavController
 import com.disparasms.app.ui.components.ModernCard
 import com.disparasms.app.ui.theme.Spacing
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImportScreen(navController: NavController) {
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }

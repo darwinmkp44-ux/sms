@@ -47,7 +47,7 @@ class ContactRepository(private val contactDao: ContactDao) {
     suspend fun existsByPhone(phone: String, groupId: Long?): Boolean =
         contactDao.existsByPhone(phone, groupId)
 
-    fun importContacts(contacts: List<ContactEntity>): Pair<Int, Int> {
+    suspend fun importContacts(contacts: List<ContactEntity>): Pair<Int, Int> {
         var imported = 0
         var skipped = 0
         contacts.forEach { contact ->
