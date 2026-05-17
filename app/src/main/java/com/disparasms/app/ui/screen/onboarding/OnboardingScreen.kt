@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.systemBarsPadding
 import kotlinx.coroutines.launch
 
 data class OnboardingPage(
@@ -72,6 +73,7 @@ fun OnboardingScreen(onComplete: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .systemBarsPadding()
     ) {
         HorizontalPager(
             state = pagerState,

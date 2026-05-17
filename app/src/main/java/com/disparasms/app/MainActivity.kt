@@ -33,12 +33,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val onboardingDone = prefs.getBoolean(KEY_ONBOARDING_DONE, false)
 
         setContent {
             DisparaSMSTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var splashDone by remember { mutableStateOf(false) }
+                    var onboardingDone by remember {
+                        mutableStateOf(prefs.getBoolean(KEY_ONBOARDING_DONE, false))
+                    }
 
                     if (!splashDone) {
                         SplashScreen()
@@ -50,7 +52,7 @@ class MainActivity : ComponentActivity() {
                         OnboardingScreen(
                             onComplete = {
                                 prefs.edit().putBoolean(KEY_ONBOARDING_DONE, true).apply()
-                                splashDone = true
+                                onboardingDone = true
                             }
                         )
                     } else {
