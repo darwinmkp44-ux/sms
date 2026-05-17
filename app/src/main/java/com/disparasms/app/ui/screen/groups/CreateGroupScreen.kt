@@ -25,27 +25,44 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.disparasms.app.data.repository.GroupRepository
 import com.disparasms.app.ui.theme.Spacing
-import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateGroupScreen(
-    navController: NavController,
-    groupRepository: GroupRepository? = null
-) {
+fun CreateGroupScreen(navController: NavController) {
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    var isSaving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val groupRepository = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            GroupRepositoryEntryPoint::class.java
+        ).groupRepository()
+    }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
+    fun saveGroup() {
+        if (name.isBlank()) return
+        isSaving = true
+        scope.launch {
+            try {
+                groupRepository.createWithContactCount(name.trim(), description.trim().ifBlank { null })
+                navController.popBackStack()
+            } catch (_: Exception) {
+                isSaving = false
+            }
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = {
                 Text(
@@ -55,18 +72,16 @@ fun CreateGroupScreen(
                 )
             },
             navigationIcon = {
-                IconButton(onClick = { navController.popBackStack() }) {
+                IconButton(onClick = {
+                    if (!isSaving) navController.popBackStack()
+                }) {
                     Icon(Icons.Default.Close, contentDescription = "Cancelar")
                 }
             },
             actions = {
                 IconButton(
-                    onClick = {
-                        scope.launch {
-                            navController.popBackStack()
-                        }
-                    },
-                    enabled = name.isNotBlank()
+                    onClick = { saveGroup() },
+                    enabled = name.isNotBlank() && !isSaving
                 ) {
                     Icon(Icons.Default.Check, contentDescription = "Salvar")
                 }
@@ -92,7 +107,8 @@ fun CreateGroupScreen(
                 onValueChange = { name = it },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Ex: Clientes VIP") },
-                singleLine = true
+                singleLine = true,
+                enabled = !isSaving
             )
 
             Spacer(Modifier.height(Spacing.lg))
@@ -108,21 +124,18 @@ fun CreateGroupScreen(
                 onValueChange = { description = it },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Ex: Clientes que compraram em 2025") },
-                minLines = 3
+                minLines = 3,
+                enabled = !isSaving
             )
 
             Spacer(Modifier.height(Spacing.xxl))
 
             Button(
-                onClick = {
-                    scope.launch {
-                        navController.popBackStack()
-                    }
-                },
+                onClick = { saveGroup() },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = name.isNotBlank()
+                enabled = name.isNotBlank() && !isSaving
             ) {
-                Text("Criar Grupo")
+                Text(if (isSaving) "A salvar..." else "Criar Grupo")
             }
         }
     }

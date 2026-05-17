@@ -26,21 +26,28 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.disparasms.app.ui.screen.home.HomeScreen
 import com.disparasms.app.ui.screen.groups.GroupsScreen
+import com.disparasms.app.ui.screen.groups.CreateGroupScreen
+import com.disparasms.app.ui.screen.groups.EditGroupScreen
+import com.disparasms.app.ui.screen.groups.GroupDetailScreen
 import com.disparasms.app.ui.screen.campaign.CreateCampaignScreen
 import com.disparasms.app.ui.screen.campaign.CampaignDetailScreen
 import com.disparasms.app.ui.screen.campaign.CampaignLogsScreen
 import com.disparasms.app.ui.screen.history.CampaignHistoryScreen
 import com.disparasms.app.ui.screen.settings.SettingsScreen
+import com.disparasms.app.ui.screen.settings.AboutScreen
+import com.disparasms.app.ui.screen.settings.BackupRestoreScreen
+import com.disparasms.app.ui.screen.settings.SimManagementScreen
 import com.disparasms.app.ui.screen.import.ImportScreen
-import com.disparasms.app.ui.screen.groups.CreateGroupScreen
 
-private val ANIM_DURATION = 250
+private const val ANIM_DURATION = 250
 
 data class BottomNavItem(
     val label: String,
@@ -114,6 +121,7 @@ fun AppNavigation() {
                 slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(ANIM_DURATION)) + fadeOut(tween(ANIM_DURATION))
             }
         ) {
+            // Bottom nav
             composable(NavRoutes.Home.route) {
                 HomeScreen(navController = navController)
             }
@@ -126,18 +134,53 @@ fun AppNavigation() {
             composable(NavRoutes.Settings.route) {
                 SettingsScreen(navController = navController)
             }
+
+            // Groups sub-routes
             composable(NavRoutes.CreateGroup.route) {
                 CreateGroupScreen(navController = navController)
             }
+            composable(
+                route = NavRoutes.EditGroup.route,
+                arguments = listOf(navArgument("groupId") { type = NavType.LongType })
+            ) {
+                EditGroupScreen(navController = navController)
+            }
+            composable(
+                route = NavRoutes.GroupDetail.route,
+                arguments = listOf(navArgument("groupId") { type = NavType.LongType })
+            ) {
+                GroupDetailScreen(navController = navController)
+            }
+
+            // Campaigns sub-routes
             composable(NavRoutes.CreateCampaign.route) {
                 CreateCampaignScreen(navController = navController)
             }
-            composable(NavRoutes.CampaignDetail.route) {
+            composable(
+                route = NavRoutes.CampaignDetail.route,
+                arguments = listOf(navArgument("campaignId") { type = NavType.LongType })
+            ) {
                 CampaignDetailScreen(navController = navController)
             }
-            composable(NavRoutes.CampaignLogs.route) {
+            composable(
+                route = NavRoutes.CampaignLogs.route,
+                arguments = listOf(navArgument("campaignId") { type = NavType.LongType })
+            ) {
                 CampaignLogsScreen(navController = navController)
             }
+
+            // Settings sub-routes
+            composable(NavRoutes.SimManagement.route) {
+                SimManagementScreen(navController = navController)
+            }
+            composable(NavRoutes.BackupRestore.route) {
+                BackupRestoreScreen(navController = navController)
+            }
+            composable(NavRoutes.About.route) {
+                AboutScreen(navController = navController)
+            }
+
+            // Import
             composable(NavRoutes.ImportContacts.route) {
                 ImportScreen(navController = navController)
             }

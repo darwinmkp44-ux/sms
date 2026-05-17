@@ -49,6 +49,14 @@ class GroupsViewModel @Inject constructor(
         _searchQuery.value = query
     }
 
+    fun duplicateGroup(groupId: Long) {
+        viewModelScope.launch {
+            val group = groupRepository.getById(groupId) ?: return@launch
+            val newName = "${group.name} (cópia)"
+            groupRepository.duplicateGroup(groupId, newName)
+        }
+    }
+
     fun deleteGroup(groupId: Long) {
         viewModelScope.launch { groupRepository.deleteById(groupId) }
     }
