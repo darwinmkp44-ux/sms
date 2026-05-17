@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.disparasms.app.ui.navigation.AppNavigation
 import com.disparasms.app.ui.screen.onboarding.OnboardingScreen
+import com.disparasms.app.ui.screen.permissions.PermissionScreen
 import com.disparasms.app.ui.screen.splash.SplashScreen
 import com.disparasms.app.ui.theme.DisparaSMSTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -56,7 +57,14 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     } else {
-                        AppNavigation()
+                        var permissionsDone by remember { mutableStateOf(false) }
+                        if (!permissionsDone) {
+                            PermissionScreen(
+                                onAllGranted = { permissionsDone = true }
+                            )
+                        } else {
+                            AppNavigation()
+                        }
                     }
                 }
             }
