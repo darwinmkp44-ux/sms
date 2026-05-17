@@ -1,1 +1,0 @@
-export JAVA_HOME=/usr/local/sdkman/candidates/java/21.0.10-ms && export ANDROID_HOME=$HOME/Android && ./gradlew assembleDebug
