@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.disparasms.app.data.local.entity.ContactEntity
 import com.disparasms.app.di.DaoEntryPoint
 import com.disparasms.app.ui.components.EmptyState
@@ -67,8 +68,8 @@ fun GroupDetailScreen(
     val groupId = navController
         .currentBackStackEntry
         ?.arguments
-        ?.getString("groupId")
-        ?.toLongOrNull()
+        ?.getLong("groupId", -1L)
+        .takeIf { it != -1L }
 
     val contactRepository = remember {
         EntryPointAccessors.fromApplication(

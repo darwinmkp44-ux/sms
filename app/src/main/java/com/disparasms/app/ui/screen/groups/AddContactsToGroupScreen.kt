@@ -60,8 +60,8 @@ fun AddContactsToGroupScreen(navController: NavController) {
     val groupId = navController
         .currentBackStackEntry
         ?.arguments
-        ?.getString("groupId")
-        ?.toLongOrNull()
+        ?.getLong("groupId", -1L)
+        .takeIf { it != -1L }
 
     val contactRepository = remember {
         EntryPointAccessors.fromApplication(
