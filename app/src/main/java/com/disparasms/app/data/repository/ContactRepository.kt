@@ -55,10 +55,17 @@ class ContactRepository(private val contactDao: ContactDao) {
         contactDao.removeFromGroup(contactIds)
     }
 
+    suspend fun getPhonesWithoutGroup(): Set<String> =
+        contactDao.getPhonesWithoutGroup().toSet()
+
     suspend fun importContacts(contacts: List<ContactEntity>): Pair<Int, Int> {
-        val ids = contactDao.insertAll(contacts)
+        if (contacts.isEmpty()) return Pair(0, 0)
+        val existingPhones = contactDao.getPhonesWithoutGroup().toSet()
+        val newContacts = contacts.filter { it.groupId != null || it.phone !in existingPhones }
+        if (newContacts.isEmpty()) return Pair(0, contacts.size)
+        val ids = contactDao.insertAll(newContacts)
         val imported = ids.count { it > 0 }
-        val skipped = ids.size - imported
+        val skipped = contacts.size - imported
         return Pair(imported, skipped)
     }
 }

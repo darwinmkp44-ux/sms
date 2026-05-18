@@ -182,7 +182,10 @@ fun AppNavigation() {
             }
 
             // Import
-            composable(NavRoutes.AddContactsToGroup.route) {
+            composable(
+                route = NavRoutes.AddContactsToGroup.route,
+                arguments = listOf(navArgument("groupId") { type = NavType.LongType })
+            ) {
                 AddContactsToGroupScreen(navController = navController)
             }
             composable(NavRoutes.ImportContacts.route) {

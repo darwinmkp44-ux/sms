@@ -60,6 +60,9 @@ interface ContactDao {
     @Query("SELECT COUNT(*) FROM contacts")
     fun observeTotalCount(): Flow<Int>
 
+    @Query("SELECT phone FROM contacts WHERE group_id IS NULL")
+    suspend fun getPhonesWithoutGroup(): List<String>
+
     @Query("SELECT EXISTS(SELECT 1 FROM contacts WHERE phone = :phone AND (group_id = :groupId OR (:groupId IS NULL AND group_id IS NULL)))")
     suspend fun existsByPhone(phone: String, groupId: Long?): Boolean
 
