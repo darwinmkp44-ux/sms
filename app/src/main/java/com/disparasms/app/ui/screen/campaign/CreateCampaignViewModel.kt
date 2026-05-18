@@ -88,7 +88,7 @@ class CreateCampaignViewModel @Inject constructor(
         updateState { it.copy(delayMs = delay) }
     }
 
-    fun createAndSend(onComplete: (Long) -> Unit) {
+    fun createCampaign(onComplete: (Long) -> Unit) {
         viewModelScope.launch {
             val state = uiState.value
             val campaignId = campaignRepository.create(

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -15,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Deselect
@@ -27,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -49,9 +52,13 @@ import androidx.navigation.NavController
 import com.disparasms.app.data.local.entity.ContactEntity
 import com.disparasms.app.di.DaoEntryPoint
 import com.disparasms.app.ui.components.EmptyState
+import com.disparasms.app.ui.components.ModernCard
 import com.disparasms.app.ui.theme.Spacing
+import com.disparasms.app.util.PhoneUtils
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +80,8 @@ fun AddContactsToGroupScreen(navController: NavController) {
 
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var isSaving by remember { mutableStateOf(false) }
+    var manualPhone by remember { mutableStateOf("") }
+    var manualPhoneError by remember { mutableStateOf<String?>(null) }
 
     val allContacts by contactRepository.observeAll()
         .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -117,20 +126,83 @@ fun AddContactsToGroupScreen(navController: NavController) {
             )
         )
 
-        if (allContacts.isEmpty()) {
-            EmptyState(
-                icon = Icons.Default.FileUpload,
-                title = "Sem contactos disponíveis",
-                description = "Importe contactos do telefone ou de um ficheiro primeiro",
-                actionLabel = "Importar Contactos",
-                onAction = { navController.navigate("import") }
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            // Manual input card
+            item {
+                ModernCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(Spacing.md)) {
+                        Text(
+                            text = "Adicionar manualmente",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(Spacing.sm))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Top,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        ) {
+                            OutlinedTextField(
+                                value = manualPhone,
+                                onValueChange = {
+                                    manualPhone = it
+                                    manualPhoneError = null
+                                },
+                                modifier = Modifier.weight(1f),
+                                placeholder = { Text("+258XXXXXXXX") },
+                                singleLine = true,
+                                isError = manualPhoneError != null,
+                                supportingText = manualPhoneError?.let { { Text(it) } }
+                            )
+                            IconButton(
+                                onClick = {
+                                    val phone = PhoneUtils.clean(manualPhone)
+                                    if (phone.isEmpty()) {
+                                        manualPhoneError = "Número inválido"
+                                        return@IconButton
+                                    }
+                                    if (!PhoneUtils.isValidMzPhone(phone)) {
+                                        manualPhoneError = "Número Moçambicano inválido"
+                                        return@IconButton
+                                    }
+                                    manualPhoneError = null
+                                    manualPhone = ""
+                                    scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            contactRepository.insert(
+                                                ContactEntity(phone = phone, fullName = phone)
+                                            )
+                                        }
+                                    }
+                                },
+                                enabled = manualPhone.isNotBlank()
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Adicionar contacto",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (allContacts.isEmpty()) {
+                item {
+                    EmptyState(
+                        icon = Icons.Default.FileUpload,
+                        title = "Sem contactos disponíveis",
+                        description = "Importe contactos do telefone ou de um ficheiro primeiro",
+                        actionLabel = "Importar Contactos",
+                        onAction = { navController.navigate("import") }
+                    )
+                }
+            } else {
                 items(allContacts, key = { it.id }) { contact ->
                     Row(
                         modifier = Modifier
@@ -166,7 +238,7 @@ fun AddContactsToGroupScreen(navController: NavController) {
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
                                 maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = contact.phone,
@@ -177,7 +249,9 @@ fun AddContactsToGroupScreen(navController: NavController) {
                     }
                 }
             }
+        }
 
+        if (allContacts.isNotEmpty()) {
             Button(
                 onClick = {
                     if (groupId != null && selectedIds.isNotEmpty()) {

@@ -10,3 +10,7 @@
 .cxx
 local.properties
 /app/build
+.pnpm-store/
+Get
+Run
+rodar.txt

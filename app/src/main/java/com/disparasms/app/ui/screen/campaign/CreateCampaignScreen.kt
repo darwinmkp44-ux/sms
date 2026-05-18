@@ -14,7 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -224,7 +224,7 @@ fun CreateCampaignScreen(
             Spacer(Modifier.height(Spacing.xxl))
             Button(
                 onClick = {
-                    viewModel.createAndSend { campaignId ->
+                    viewModel.createCampaign { campaignId ->
                         navController.navigate("campaigns/$campaignId") {
                             popUpTo("campaigns") { inclusive = false }
                         }
@@ -241,9 +241,9 @@ fun CreateCampaignScreen(
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 }
-                Icon(Icons.Default.Send, contentDescription = null)
+                Icon(Icons.Default.Check, contentDescription = null)
                 Text(
-                    text = "Iniciar Disparo (${state.totalRecipients} contactos)",
+                    text = "Salvar Campanha",
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }

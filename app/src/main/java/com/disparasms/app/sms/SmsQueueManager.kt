@@ -95,6 +95,15 @@ class SmsQueueManager(
                         delay(customDelayMs)
                     }
 
+                    campaignRepository.updateProgress(
+                        id = campaignId,
+                        sent = sent,
+                        delivered = 0,
+                        failed = failed,
+                        pending = total - sent - failed,
+                        status = com.disparasms.app.data.local.entity.CampaignStatus.SENDING
+                    )
+
                     if (chunkIndex < chunks.size - 1) {
                         delay(CHUNK_DELAY_MS)
                     }
