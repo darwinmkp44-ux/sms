@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Deselect
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.Button
@@ -122,9 +123,11 @@ fun AddContactsToGroupScreen(navController: NavController) {
 
         if (allContacts.isEmpty()) {
             EmptyState(
-                icon = Icons.Default.Person,
+                icon = Icons.Default.FileUpload,
                 title = "Sem contactos disponíveis",
-                description = "Importe contactos primeiro para adicionar a este grupo"
+                description = "Importe contactos do telefone ou de um ficheiro primeiro",
+                actionLabel = "Importar Contactos",
+                onAction = { navController.navigate("import") }
             )
         } else {
             LazyColumn(
