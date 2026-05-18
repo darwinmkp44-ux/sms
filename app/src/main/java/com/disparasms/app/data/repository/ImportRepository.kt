@@ -2,6 +2,7 @@ package com.disparasms.app.data.repository
 
 import android.content.Context
 import android.net.Uri
+import android.provider.ContactsContract
 import com.disparasms.app.data.local.entity.ContactEntity
 import com.disparasms.app.util.PhoneUtils
 import com.github.doyaaaaaken.kotlincsv.dsl.csvReader
@@ -121,6 +122,67 @@ class ImportRepository @Inject constructor(
         )
     }
 
+    suspend fun importFromPhoneContacts(): ImportResult {
+        return try {
+            val cursor = context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER
+                ),
+                null, null,
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC"
+            )
+
+            val contacts = mutableListOf<ContactEntity>()
+            val seenPhones = mutableSetOf<String>()
+
+            cursor?.use { c ->
+                val nameIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                val phoneIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+
+                while (c.moveToNext()) {
+                    val rawPhone = if (phoneIdx >= 0) c.getString(phoneIdx) ?: "" else ""
+                    val phone = PhoneUtils.clean(rawPhone)
+
+                    if (phone.isEmpty() || !PhoneUtils.isValidMzPhone(phone)) continue
+                    if (phone in seenPhones) continue
+                    seenPhones.add(phone)
+
+                    val displayName = if (nameIdx >= 0) c.getString(nameIdx) ?: "" else ""
+                    val nameParts = displayName.trim().split("\\s+".toRegex()).filter { it.isNotBlank() }
+                    val firstName = nameParts.firstOrNull()
+                    val lastName = if (nameParts.size > 1) nameParts.last() else null
+                    val fullName = displayName.ifBlank { phone }
+
+                    contacts.add(ContactEntity(
+                        phone = phone,
+                        firstName = firstName,
+                        lastName = lastName,
+                        fullName = fullName,
+                        importedFrom = "phone"
+                    ))
+                }
+            }
+
+            if (contacts.isEmpty()) {
+                return ImportResult(errors = listOf("Nenhum contacto com número Moçambicano encontrado no telefone."))
+            }
+
+            val (imported, skipped) = contactRepository.importContacts(contacts)
+            ImportResult(
+                totalFound = contacts.size + skipped,
+                imported = imported,
+                skipped = skipped,
+                contacts = contacts
+            )
+        } catch (e: SecurityException) {
+            ImportResult(errors = listOf("Permissão de leitura de contactos não concedida."))
+        } catch (e: Exception) {
+            ImportResult(errors = listOf("Erro ao ler contactos: ${e.message}"))
+        }
+    }
+
     suspend fun importFromUri(
         uri: Uri,
         groupId: Long?,
@@ -153,6 +215,7 @@ class ImportRepository @Inject constructor(
         return when {
             fileName.endsWith(".csv", true) -> importCsv(stream, groupId, columnMapping, hasHeader)
             fileName.endsWith(".xlsx", true) || fileName.endsWith(".xls", true) -> importExcel(stream, groupId, columnMapping, hasHeader)
+            fileName.endsWith(".txt", true) -> importTxt(stream, groupId)
             else -> ImportResult(errors = listOf("Unsupported file format"))
         }
     }
@@ -194,6 +257,41 @@ class ImportRepository @Inject constructor(
 
         workbook.close()
         return processRows(rows, header, columnMapping, groupId)
+    }
+
+    private fun importTxt(
+        stream: InputStream,
+        groupId: Long?
+    ): ImportResult {
+        val text = stream.bufferedReader().readText()
+        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+
+        var invalidPhones = 0
+        val seenPhones = mutableSetOf<String>()
+
+        val contacts = lines.mapNotNull { line ->
+            val phone = PhoneUtils.clean(line)
+            if (phone.isEmpty() || !PhoneUtils.isValidMzPhone(phone)) {
+                invalidPhones++
+                return@mapNotNull null
+            }
+            if (phone in seenPhones) return@mapNotNull null
+            seenPhones.add(phone)
+            ContactEntity(
+                groupId = groupId,
+                phone = phone,
+                fullName = phone,
+                importedFrom = "txt"
+            )
+        }
+
+        return ImportResult(
+            totalFound = lines.size,
+            imported = 0,
+            skipped = lines.size - contacts.size - invalidPhones,
+            invalidPhones = invalidPhones,
+            contacts = contacts
+        )
     }
 
     private fun processRows(
