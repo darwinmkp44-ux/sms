@@ -64,7 +64,7 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImportScreen(navController: NavController) {
+fun ImportScreen(navController: NavController, groupId: Long? = null) {
     var mode by remember { mutableStateOf<String?>(null) }
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf<String?>(null) }
@@ -98,7 +98,7 @@ fun ImportScreen(navController: NavController) {
             isImporting = true
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
-                    importRepository.importFromPhoneContacts { current, total ->
+                    importRepository.importFromPhoneContacts(groupId = groupId) { current, total ->
                         importProgress = current to total
                     }
                 }
@@ -277,7 +277,7 @@ fun ImportScreen(navController: NavController) {
                         if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
                             isImporting = true
                             val result = withContext(Dispatchers.IO) {
-                                importRepository.importFromPhoneContacts { current, total ->
+                                importRepository.importFromPhoneContacts(groupId = groupId) { current, total ->
                                     importProgress = current to total
                                 }
                             }
@@ -376,7 +376,7 @@ fun ImportScreen(navController: NavController) {
                                     isImporting = true
                                     scope.launch {
                                         val result = withContext(Dispatchers.IO) {
-                                            importRepository.importFromUri(uri, groupId = null)
+                                            importRepository.importFromUri(uri, groupId = groupId)
                                         }
                                         importResult = result
                                         isImporting = false

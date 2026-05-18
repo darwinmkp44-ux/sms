@@ -189,7 +189,15 @@ fun AppNavigation() {
                 AddContactsToGroupScreen(navController = navController)
             }
             composable(NavRoutes.ImportContacts.route) {
-                ImportScreen(navController = navController)
+                ImportScreen(navController = navController, groupId = null)
+            }
+            composable(
+                route = "import/{groupId}",
+                arguments = listOf(navArgument("groupId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val groupId = backStackEntry.arguments?.getLong("groupId", -1L)
+                    ?.takeIf { it != -1L }
+                ImportScreen(navController = navController, groupId = groupId)
             }
         }
     }

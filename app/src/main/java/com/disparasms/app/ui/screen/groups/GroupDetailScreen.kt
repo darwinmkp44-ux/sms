@@ -161,7 +161,7 @@ fun GroupDetailScreen(
                 fontWeight = FontWeight.SemiBold
             )
             IconButton(onClick = {
-                navController.navigate("groups/$groupId/add-contacts")
+                navController.navigate("import/$groupId")
             }) {
                 Icon(Icons.Default.Add, contentDescription = "Adicionar contactos")
             }
@@ -173,7 +173,7 @@ fun GroupDetailScreen(
                 title = "Sem contactos",
                 description = "Adicione contactos a este grupo",
                 actionLabel = "Adicionar Contactos",
-                onAction = { navController.navigate("groups/$groupId/add-contacts") }
+                onAction = { navController.navigate("import/$groupId") }
             )
         } else {
             LazyColumn(

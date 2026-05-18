@@ -123,6 +123,7 @@ class ImportRepository @Inject constructor(
     }
 
     suspend fun importFromPhoneContacts(
+        groupId: Long? = null,
         onProgress: suspend (imported: Int, total: Int) -> Unit = { _, _ -> }
     ): ImportResult {
         return try {
@@ -158,6 +159,7 @@ class ImportRepository @Inject constructor(
                     val fullName = displayName.ifBlank { phone }
 
                     contacts.add(ContactEntity(
+                        groupId = groupId,
                         phone = phone,
                         firstName = firstName,
                         lastName = lastName,

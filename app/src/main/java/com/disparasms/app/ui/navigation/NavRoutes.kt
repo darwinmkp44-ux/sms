@@ -22,7 +22,9 @@ sealed class NavRoutes(val route: String) {
     data object CampaignLogs : NavRoutes("campaigns/{campaignId}/logs") {
         fun createRoute(campaignId: Long) = "campaigns/$campaignId/logs"
     }
-    data object ImportContacts : NavRoutes("import")
+    data object ImportContacts : NavRoutes("import") {
+        fun createRoute(groupId: Long?) = if (groupId != null) "import/$groupId" else "import"
+    }
     data object AddContactsToGroup : NavRoutes("groups/{groupId}/add-contacts") {
         fun createRoute(groupId: Long) = "groups/$groupId/add-contacts"
     }
