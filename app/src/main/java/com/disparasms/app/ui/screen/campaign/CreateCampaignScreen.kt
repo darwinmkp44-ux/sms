@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -191,10 +192,37 @@ fun CreateCampaignScreen(
 
                 // SIM selection
                 if (state.simSlots.size > 1) {
-                    Text(
-                        text = "SIM: ${state.simSlots.getOrNull(state.simSlot)?.carrierName ?: "Padrão"}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    var simMenuExpanded by remember { mutableStateOf(false) }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "SIM para envio",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = { simMenuExpanded = true }) {
+                            Text(
+                                text = state.simSlots.getOrNull(state.simSlot)?.carrierName
+                                    ?: "SIM ${state.simSlot + 1}"
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = simMenuExpanded,
+                            onDismissRequest = { simMenuExpanded = false }
+                        ) {
+                            state.simSlots.forEachIndexed { index, sim ->
+                                DropdownMenuItem(
+                                    text = { Text(sim.carrierName ?: "SIM ${index + 1}") },
+                                    onClick = {
+                                        viewModel.setSimSlot(index)
+                                        simMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Spacer(Modifier.height(Spacing.md))

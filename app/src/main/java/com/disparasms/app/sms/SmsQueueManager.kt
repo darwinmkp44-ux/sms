@@ -38,6 +38,7 @@ class SmsQueueManager(
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private var currentJob: Job? = null
+    private var sendGeneration = 0L
 
     private val _progress = MutableStateFlow<SendProgress?>(null)
     val progress: StateFlow<SendProgress?> = _progress
@@ -49,6 +50,7 @@ class SmsQueueManager(
         customDelayMs: Long = PER_MESSAGE_DELAY_MS
     ) {
         stopSending()
+        val generation = ++sendGeneration
 
         currentJob = scope.launch {
             try {
@@ -132,7 +134,7 @@ class SmsQueueManager(
 
             } catch (e: CancellationException) {
                 val current = _progress.value
-                if (current != null) {
+                if (current != null && generation == sendGeneration) {
                     campaignRepository.updateProgress(
                         id = campaignId,
                         sent = current.sent,

@@ -20,7 +20,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -129,6 +131,14 @@ fun GroupDetailScreen(
                                 }
                             },
                             leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Adicionar manualmente") },
+                            onClick = {
+                                showMenu = false
+                                navController.navigate("groups/$groupId/add-contacts")
+                            },
+                            leadingIcon = { Icon(Icons.Default.Create, contentDescription = null) }
                         )
                     }
                 }

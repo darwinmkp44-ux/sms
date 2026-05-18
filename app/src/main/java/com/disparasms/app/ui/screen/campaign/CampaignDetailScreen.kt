@@ -21,16 +21,23 @@ import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.SimCard
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -49,6 +56,9 @@ import com.disparasms.app.ui.theme.Spacing
 import com.disparasms.app.ui.theme.successGreen
 import com.disparasms.app.ui.theme.errorRed
 import com.disparasms.app.ui.theme.warningOrange
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +67,7 @@ fun CampaignDetailScreen(
     viewModel: CampaignDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var simMenuExpanded by remember { mutableStateOf(false) }
 
     if (state.isLoading) {
         LoadingIndicator()
@@ -64,6 +75,11 @@ fun CampaignDetailScreen(
     }
 
     val campaign = state.campaign ?: return
+
+    fun formatDateTime(timestamp: Long): String {
+        val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+        return sdf.format(Date(timestamp))
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -166,6 +182,68 @@ fun CampaignDetailScreen(
                         icon = Icons.Default.HourglassEmpty,
                         color = MaterialTheme.colorScheme.warningOrange,
                         value = campaign.pendingCount.toString()
+                    )
+                }
+            }
+        }
+
+        // SIM selection
+        item {
+            Spacer(Modifier.height(Spacing.lg))
+            SectionHeader(title = "SIM Card")
+            ModernCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.lg),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.SimCard,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(Spacing.md))
+                    Text(
+                        text = "SIM para envio",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { simMenuExpanded = true }) {
+                        Text(
+                            text = state.simSlots.getOrNull(campaign.simSlot)?.carrierName
+                                ?: "SIM ${campaign.simSlot + 1}"
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = simMenuExpanded,
+                        onDismissRequest = { simMenuExpanded = false }
+                    ) {
+                        state.simSlots.forEachIndexed { index, sim ->
+                            DropdownMenuItem(
+                                text = { Text(sim.carrierName ?: "SIM ${index + 1}") },
+                                onClick = {
+                                    viewModel.updateSimSlot(index)
+                                    simMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Criada em ${formatDateTime(campaign.createdAt)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
