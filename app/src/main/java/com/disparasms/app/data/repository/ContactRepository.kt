@@ -56,12 +56,9 @@ class ContactRepository(private val contactDao: ContactDao) {
     }
 
     suspend fun importContacts(contacts: List<ContactEntity>): Pair<Int, Int> {
-        var imported = 0
-        var skipped = 0
-        contacts.forEach { contact ->
-            val id = contactDao.insert(contact)
-            if (id > 0) imported++ else skipped++
-        }
+        val ids = contactDao.insertAll(contacts)
+        val imported = ids.count { it > 0 }
+        val skipped = ids.size - imported
         return Pair(imported, skipped)
     }
 }

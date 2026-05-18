@@ -122,7 +122,9 @@ class ImportRepository @Inject constructor(
         )
     }
 
-    suspend fun importFromPhoneContacts(): ImportResult {
+    suspend fun importFromPhoneContacts(
+        onProgress: suspend (imported: Int, total: Int) -> Unit = { _, _ -> }
+    ): ImportResult {
         return try {
             val cursor = context.contentResolver.query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -169,11 +171,22 @@ class ImportRepository @Inject constructor(
                 return ImportResult(errors = listOf("Nenhum contacto com número Moçambicano encontrado no telefone."))
             }
 
-            val (imported, skipped) = contactRepository.importContacts(contacts)
+            val total = contacts.size
+            val batchSize = 100
+            var totalImported = 0
+            var totalSkipped = 0
+
+            contacts.chunked(batchSize).forEach { batch ->
+                val (imported, skipped) = contactRepository.importContacts(batch)
+                totalImported += imported
+                totalSkipped += skipped
+                onProgress(totalImported, total)
+            }
+
             ImportResult(
-                totalFound = contacts.size + skipped,
-                imported = imported,
-                skipped = skipped,
+                totalFound = total,
+                imported = totalImported,
+                skipped = totalSkipped,
                 contacts = contacts
             )
         } catch (e: SecurityException) {

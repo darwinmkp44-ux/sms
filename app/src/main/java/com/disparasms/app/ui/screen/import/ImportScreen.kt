@@ -32,6 +32,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,6 +70,7 @@ fun ImportScreen(navController: NavController) {
     var selectedFileName by remember { mutableStateOf<String?>(null) }
     var isImporting by remember { mutableStateOf(false) }
     var importResult by remember { mutableStateOf<ImportResult?>(null) }
+    var importProgress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -96,10 +98,13 @@ fun ImportScreen(navController: NavController) {
             isImporting = true
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
-                    importRepository.importFromPhoneContacts()
+                    importRepository.importFromPhoneContacts { current, total ->
+                        importProgress = current to total
+                    }
                 }
                 importResult = result
                 isImporting = false
+                importProgress = null
             }
         } else {
             importResult = ImportResult(errors = listOf(
@@ -233,18 +238,38 @@ fun ImportScreen(navController: NavController) {
 
             "phone" -> {
                 if (isImporting) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(Spacing.lg),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator()
-                            Spacer(Modifier.height(Spacing.md))
-                            Text(
-                                text = "A importar contactos do telefone...",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
+                        LinearProgressIndicator(
+                            progress = {
+                                if (importProgress != null)
+                                    importProgress!!.first.toFloat() / importProgress!!.second.toFloat()
+                                else 0f
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(Spacing.md))
+                        Text(
+                            text = if (importProgress != null)
+                                "Importados ${importProgress!!.first} de ${importProgress!!.second} contactos..."
+                            else
+                                "A preparar importação...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(Spacing.sm))
+                        Text(
+                            text = if (importProgress != null)
+                                "${((importProgress!!.first.toFloat() / importProgress!!.second.toFloat()) * 100).toInt()}%"
+                            else "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 } else {
                     LaunchedEffect(Unit) {
@@ -252,10 +277,13 @@ fun ImportScreen(navController: NavController) {
                         if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
                             isImporting = true
                             val result = withContext(Dispatchers.IO) {
-                                importRepository.importFromPhoneContacts()
+                                importRepository.importFromPhoneContacts { current, total ->
+                                    importProgress = current to total
+                                }
                             }
                             importResult = result
                             isImporting = false
+                            importProgress = null
                         } else {
                             permissionLauncher.launch(permission)
                         }
