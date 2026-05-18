@@ -1,6 +1,8 @@
 package com.disparasms.app.ui.screen.campaign
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,16 +14,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.SimCard
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -47,6 +55,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.disparasms.app.data.local.entity.CampaignLogEntity
+import com.disparasms.app.data.local.entity.CampaignLogStatus
 import com.disparasms.app.ui.components.LoadingIndicator
 import com.disparasms.app.ui.components.ModernCard
 import com.disparasms.app.ui.components.SectionHeader
@@ -68,6 +77,8 @@ fun CampaignDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var simMenuExpanded by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editMessage by remember { mutableStateOf("") }
 
     if (state.isLoading) {
         LoadingIndicator()
@@ -79,6 +90,38 @@ fun CampaignDetailScreen(
     fun formatDateTime(timestamp: Long): String {
         val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         return sdf.format(Date(timestamp))
+    }
+
+    if (showEditDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            icon = { Icon(Icons.Default.Edit, contentDescription = null) },
+            title = { Text("Editar Mensagem") },
+            text = {
+                OutlinedTextField(
+                    value = editMessage,
+                    onValueChange = { editMessage = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 4,
+                    maxLines = 8
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (editMessage.isNotBlank()) {
+                        viewModel.updateMessage(editMessage)
+                        showEditDialog = false
+                    }
+                }) {
+                    Text("Salvar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     LazyColumn(
@@ -114,6 +157,12 @@ fun CampaignDetailScreen(
                         IconButton(onClick = { viewModel.resumeSending() }) {
                             Icon(Icons.Default.PlayArrow, contentDescription = "Continuar")
                         }
+                    }
+                    IconButton(onClick = {
+                        editMessage = campaign.message
+                        showEditDialog = true
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Editar mensagem")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -187,7 +236,7 @@ fun CampaignDetailScreen(
             }
         }
 
-        // SIM selection
+        // SIM + date
         item {
             Spacer(Modifier.height(Spacing.lg))
             SectionHeader(title = "SIM Card")
@@ -270,50 +319,99 @@ fun CampaignDetailScreen(
         // Logs
         item {
             Spacer(Modifier.height(Spacing.lg))
-            SectionHeader(title = "Logs de Envio")
+            SectionHeader(title = "Mensagens Enviadas")
         }
 
         if (state.logs.isEmpty()) {
             item {
                 Text(
-                    text = "Nenhum log disponível",
+                    text = "Nenhuma mensagem enviada",
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         } else {
-            items(state.logs.take(50), key = { it.id }) { log ->
-                LogItem(log = log)
+            items(state.logs.take(100), key = { it.id }) { log ->
+                ChatLogItem(log = log)
             }
         }
     }
 }
 
 @Composable
-private fun LogItem(log: CampaignLogEntity) {
-    ModernCard(
+private fun ChatLogItem(log: CampaignLogEntity) {
+    val bubbleColor = when (log.status) {
+        CampaignLogStatus.DELIVERED -> MaterialTheme.colorScheme.primaryContainer
+        CampaignLogStatus.FAILED -> MaterialTheme.colorScheme.errorContainer
+        CampaignLogStatus.SENT -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val statusIcon = when (log.status) {
+        CampaignLogStatus.DELIVERED -> Icons.Default.CheckCircle
+        CampaignLogStatus.FAILED -> Icons.Default.Error
+        CampaignLogStatus.SENT -> Icons.Default.Done
+        else -> Icons.Default.HourglassEmpty
+    }
+    val statusTint = when (log.status) {
+        CampaignLogStatus.DELIVERED -> MaterialTheme.colorScheme.successGreen
+        CampaignLogStatus.FAILED -> MaterialTheme.colorScheme.errorRed
+        CampaignLogStatus.SENT -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.warningOrange
+    }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = 2.dp)
+            .padding(horizontal = Spacing.lg, vertical = 3.dp)
     ) {
+        Text(
+            text = log.firstName ?: log.phone,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 2.dp)
+        )
         Row(
-            modifier = Modifier.padding(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = log.firstName ?: log.phone,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = log.phone,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Card(
+                modifier = Modifier.weight(1f, fill = false),
+                shape = RoundedCornerShape(
+                    topStart = 12.dp,
+                    topEnd = 12.dp,
+                    bottomEnd = 12.dp,
+                    bottomStart = 2.dp
+                ),
+                colors = CardDefaults.cardColors(containerColor = bubbleColor),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Text(
+                        text = log.message,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = log.phone,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                        Icon(
+                            imageVector = statusIcon,
+                            contentDescription = log.status,
+                            tint = statusTint,
+                            modifier = Modifier.padding(start = 2.dp)
+                        )
+                    }
+                }
             }
-            StatusBadge(status = log.status)
         }
     }
 }

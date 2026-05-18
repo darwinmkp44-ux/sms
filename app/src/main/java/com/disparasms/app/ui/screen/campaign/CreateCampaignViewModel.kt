@@ -89,7 +89,10 @@ class CreateCampaignViewModel @Inject constructor(
     }
 
     fun createCampaign(onComplete: (Long) -> Unit) {
+        if (uiState.value.isLoading) return
+        updateState { it.copy(isLoading = true) }
         viewModelScope.launch {
+            try {
             val state = uiState.value
             val campaignId = campaignRepository.create(
                 name = state.name.ifBlank { "Campanha ${System.currentTimeMillis()}" },
@@ -121,7 +124,11 @@ class CreateCampaignViewModel @Inject constructor(
             }
 
             campaignRepository.insertLogs(logs)
+            updateState { it.copy(isLoading = false) }
             onComplete(campaignId)
+            } catch (e: Exception) {
+                updateState { it.copy(isLoading = false) }
+            }
         }
     }
 

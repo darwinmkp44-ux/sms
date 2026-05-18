@@ -18,6 +18,7 @@ data class SendProgress(
     val campaignId: Long,
     val total: Int = 0,
     val sent: Int = 0,
+    val delivered: Int = 0,
     val failed: Int = 0,
     val pending: Int = 0,
     val isRunning: Boolean = false,
@@ -31,7 +32,7 @@ class SmsQueueManager(
 
     companion object {
         private const val TAG = "SmsQueueManager"
-        private const val CHUNK_SIZE = 10
+        private const val CHUNK_SIZE = 5
         private const val CHUNK_DELAY_MS = 3000L
         private const val PER_MESSAGE_DELAY_MS = 1500L
     }
@@ -56,6 +57,7 @@ class SmsQueueManager(
             try {
                 val total = logs.size
                 var sent = 0
+                var delivered = 0
                 var failed = 0
 
                 _progress.value = SendProgress(
@@ -80,8 +82,9 @@ class SmsQueueManager(
                         val result = smsSender.sendSms(phone, log.message, simSlot)
 
                         if (result.success) {
-                            campaignRepository.markLogSent(log.id)
+                            campaignRepository.markLogDelivered(log.id)
                             sent++
+                            delivered++
                         } else {
                             campaignRepository.markLogFailed(log.id, result.error)
                             failed++
@@ -90,6 +93,7 @@ class SmsQueueManager(
 
                         _progress.value = _progress.value?.copy(
                             sent = sent,
+                            delivered = delivered,
                             failed = failed,
                             pending = total - sent - failed
                         )
@@ -100,7 +104,7 @@ class SmsQueueManager(
                     campaignRepository.updateProgress(
                         id = campaignId,
                         sent = sent,
-                        delivered = 0,
+                        delivered = delivered,
                         failed = failed,
                         pending = total - sent - failed,
                         status = com.disparasms.app.data.local.entity.CampaignStatus.SENDING
@@ -121,7 +125,7 @@ class SmsQueueManager(
                 campaignRepository.updateProgress(
                     id = campaignId,
                     sent = sent,
-                    delivered = 0,
+                    delivered = delivered,
                     failed = failed,
                     pending = 0,
                     status = finalStatus
@@ -138,7 +142,7 @@ class SmsQueueManager(
                     campaignRepository.updateProgress(
                         id = campaignId,
                         sent = current.sent,
-                        delivered = 0,
+                        delivered = current.delivered,
                         failed = current.failed,
                         pending = current.pending,
                         status = com.disparasms.app.data.local.entity.CampaignStatus.PAUSED

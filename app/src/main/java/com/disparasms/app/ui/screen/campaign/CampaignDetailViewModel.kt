@@ -77,4 +77,11 @@ class CampaignDetailViewModel @Inject constructor(
     fun resumeSending() {
         startSending()
     }
+
+    fun updateMessage(newMessage: String) {
+        viewModelScope.launch {
+            val campaign = uiState.value.campaign ?: return@launch
+            campaignRepository.update(campaign.copy(message = newMessage))
+        }
+    }
 }

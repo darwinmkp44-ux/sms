@@ -18,13 +18,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -34,6 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -47,16 +52,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
+import com.disparasms.app.data.local.entity.ContactEntity
 import com.disparasms.app.data.repository.ImportResult
 import com.disparasms.app.di.DaoEntryPoint
 import com.disparasms.app.ui.components.ModernCard
 import com.disparasms.app.ui.theme.Spacing
+import com.disparasms.app.util.PhoneUtils
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -72,8 +80,19 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
     var importResult by remember { mutableStateOf<ImportResult?>(null) }
     var importProgress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
+    var manualPhone by remember { mutableStateOf("") }
+    var manualName by remember { mutableStateOf("") }
+    var manualPhoneError by remember { mutableStateOf<String?>(null) }
+    var manualContacts by remember { mutableStateOf<List<ContactEntity>>(emptyList()) }
+
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val contactRepository = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            DaoEntryPoint::class.java
+        ).contactRepository()
+    }
     val importRepository = remember {
         EntryPointAccessors.fromApplication(
             context.applicationContext,
@@ -142,94 +161,174 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
 
         when (mode) {
             null -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(Spacing.lg),
-                    verticalArrangement = Arrangement.Center
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
-                    ModernCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(Spacing.xxl),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(Modifier.height(Spacing.md))
-                            Text(
-                                text = "Importar do Telefone",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(Spacing.sm))
-                            Text(
-                                text = "Lê os contactos do seu celular",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(Spacing.lg))
-                            Button(
-                                onClick = {
-                                    mode = "phone"
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Importar")
+                    // Manual input card
+                    item {
+                        ModernCard(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(Spacing.lg)) {
+                                Text(
+                                    text = "Adicionar manualmente",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(Modifier.height(Spacing.sm))
+                                OutlinedTextField(
+                                    value = manualName,
+                                    onValueChange = { manualName = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    placeholder = { Text("Nome (opcional)") },
+                                    singleLine = true
+                                )
+                                Spacer(Modifier.height(Spacing.sm))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                                ) {
+                                    OutlinedTextField(
+                                        value = manualPhone,
+                                        onValueChange = {
+                                            manualPhone = it
+                                            manualPhoneError = null
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        placeholder = { Text("+258XXXXXXXX") },
+                                        singleLine = true,
+                                        isError = manualPhoneError != null,
+                                        supportingText = manualPhoneError?.let { { Text(it) } }
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            val phone = PhoneUtils.clean(manualPhone)
+                                            if (phone.isEmpty()) {
+                                                manualPhoneError = "Número inválido"
+                                                return@IconButton
+                                            }
+                                            if (!PhoneUtils.isValidMzPhone(phone)) {
+                                                manualPhoneError = "Número Moçambicano inválido"
+                                                return@IconButton
+                                            }
+                                            manualPhoneError = null
+                                            val name = manualName.ifBlank { phone }
+                                            manualPhone = ""
+                                            manualName = ""
+                                            scope.launch {
+                                                withContext(Dispatchers.IO) {
+                                                    contactRepository.insert(
+                                                        ContactEntity(phone = phone, fullName = name)
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        enabled = manualPhone.isNotBlank()
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = "Adicionar contacto",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                                if (manualContacts.isNotEmpty()) {
+                                    Spacer(Modifier.height(Spacing.sm))
+                                    Text(
+                                        text = "${manualContacts.size} adicionados manualmente",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
 
-                    Spacer(Modifier.height(Spacing.md))
-
-                    ModernCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(Spacing.xxl),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FileUpload,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(Modifier.height(Spacing.md))
-                            Text(
-                                text = "Importar de Ficheiro",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(Spacing.sm))
-                            Text(
-                                text = "Excel, CSV ou TXT",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(Spacing.lg))
-                            Button(
-                                onClick = {
-                                    filePickerLauncher.launch(arrayOf(
-                                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        "application/vnd.ms-excel",
-                                        "text/csv",
-                                        "text/comma-separated-values",
-                                        "text/plain"
-                                    ))
-                                },
-                                modifier = Modifier.fillMaxWidth()
+                    // Import from Phone
+                    item {
+                        ModernCard(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(Spacing.xxl),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text("Seleccionar")
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(Modifier.height(Spacing.md))
+                                Text(
+                                    text = "Importar do Telefone",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(Modifier.height(Spacing.sm))
+                                Text(
+                                    text = "Lê os contactos do seu celular",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(Modifier.height(Spacing.lg))
+                                Button(
+                                    onClick = { mode = "phone" },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Importar")
+                                }
+                            }
+                        }
+                    }
+
+                    // Import from File
+                    item {
+                        ModernCard(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(Spacing.xxl),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FileUpload,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(Modifier.height(Spacing.md))
+                                Text(
+                                    text = "Importar de Ficheiro",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(Modifier.height(Spacing.sm))
+                                Text(
+                                    text = "Excel, CSV ou TXT",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(Modifier.height(Spacing.lg))
+                                Button(
+                                    onClick = {
+                                        filePickerLauncher.launch(arrayOf(
+                                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                            "application/vnd.ms-excel",
+                                            "text/csv",
+                                            "text/comma-separated-values",
+                                            "text/plain"
+                                        ))
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Seleccionar")
+                                }
                             }
                         }
                     }
