@@ -4,7 +4,7 @@ object PhoneUtils {
 
     private val MZ_PREFIXES = listOf("82", "83", "84", "85", "86", "87")
 
-    private val VALID_MZ_REGEX = Regex("^\\+?258?[8][2-7]\\d{6}$")
+    private val VALID_MZ_REGEX = Regex("^\\+?258?[8][2-7]\\d{6,7}$")
     private val CLEAN_REGEX = Regex("[^\\d+]")
 
     fun clean(phone: String): String {
