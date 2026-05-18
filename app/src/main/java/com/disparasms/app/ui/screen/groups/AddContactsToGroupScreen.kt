@@ -32,7 +32,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.disparasms.app.data.local.entity.ContactEntity
 import com.disparasms.app.di.DaoEntryPoint
@@ -71,15 +71,11 @@ fun AddContactsToGroupScreen(navController: NavController) {
         ).contactRepository()
     }
 
-    var allContacts by remember { mutableStateOf<List<ContactEntity>>(emptyList()) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var isSaving by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        contactRepository.observeAll().collect { contacts ->
-            allContacts = contacts
-        }
-    }
+    val allContacts by contactRepository.observeAll()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
