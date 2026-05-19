@@ -31,7 +31,8 @@ data class ImportPreview(
 @Singleton
 class ImportRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val contactRepository: ContactRepository
+    private val contactRepository: ContactRepository,
+    private val groupRepository: GroupRepository
 ) {
     companion object {
         private val PHONE_ALIASES = listOf(
@@ -133,8 +134,7 @@ class ImportRepository @Inject constructor(
                     ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
                     ContactsContract.CommonDataKinds.Phone.NUMBER
                 ),
-                null, null,
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC"
+                null, null, null
             )
 
             val contacts = mutableListOf<ContactEntity>()
@@ -187,6 +187,8 @@ class ImportRepository @Inject constructor(
                 onProgress(totalImported, total)
             }
 
+            if (groupId != null) groupRepository.refreshContactCount(groupId)
+
             ImportResult(
                 totalFound = total,
                 imported = totalImported,
@@ -220,6 +222,7 @@ class ImportRepository @Inject constructor(
                 }
                 if (result.errors.isEmpty() && result.contacts.isNotEmpty()) {
                     val (imported, skipped) = contactRepository.importContacts(result.contacts)
+                    if (groupId != null) groupRepository.refreshContactCount(groupId)
                     result.copy(imported = imported, skipped = result.skipped + skipped)
                 } else {
                     result
@@ -240,7 +243,8 @@ class ImportRepository @Inject constructor(
         val allRows = csvReader().readAll(stream)
         val header = if (hasHeader && allRows.isNotEmpty()) allRows.first() else emptyList()
         val data = if (hasHeader && allRows.size > 1) allRows.drop(1) else allRows
-        return processRowsWithProgress(data, header, columnMapping, groupId, data.size, onProgress)
+        val resolvedMapping = if (columnMapping.isEmpty()) autoDetectColumns(header) else columnMapping
+        return processRowsFast(data, header, resolvedMapping, groupId, data.size, onProgress)
     }
 
     private fun importExcel(
@@ -359,6 +363,81 @@ class ImportRepository @Inject constructor(
                 row[nameColumnIdx].trim().split(" ").drop(1).takeLast(1).firstOrNull()
             } else null
 
+            val fullName = when {
+                firstName != null && lastName != null -> "$firstName $lastName"
+                firstName != null -> firstName
+                else -> phone
+            }
+
+            contacts.add(ContactEntity(
+                groupId = groupId,
+                phone = phone,
+                firstName = firstName,
+                lastName = lastName,
+                fullName = fullName,
+                importedFrom = "excel"
+            ))
+        }
+
+        return ImportResult(
+            totalFound = rows.size,
+            imported = 0,
+            skipped = rows.size - contacts.size - invalidPhones,
+            invalidPhones = invalidPhones,
+            contacts = contacts
+        )
+    }
+
+    private suspend fun processRowsFast(
+        rows: List<List<String>>,
+        header: List<String>,
+        mapping: Map<String, String>,
+        groupId: Long?,
+        totalEstimate: Int,
+        onProgress: suspend (processed: Int, total: Int) -> Unit
+    ): ImportResult {
+        val phoneColumnIdx = findColumnIndex(header, mapping, "phone")
+        val firstNameColumnIdx = findColumnIndex(header, mapping, "first_name")
+        val lastNameColumnIdx = findColumnIndex(header, mapping, "last_name")
+        val nameColumnIdx = findColumnIndex(header, mapping, "name")
+
+        if (phoneColumnIdx == -1) {
+            return ImportResult(errors = listOf(
+                "Coluna de telefone não encontrada. " +
+                "Verifique se o ficheiro tem uma coluna com nome 'Telefone', 'Celular', 'Phone' etc."
+            ))
+        }
+
+        var invalidPhones = 0
+        val seenPhones = mutableSetOf<String>()
+        val contacts = ArrayList<ContactEntity>(totalEstimate)
+
+        for (row in rows) {
+            if (phoneColumnIdx >= row.size) continue
+
+            val rawPhone = row[phoneColumnIdx].trim()
+            val phone = PhoneUtils.clean(rawPhone)
+
+            if (phone.isEmpty() || !PhoneUtils.isValidMzPhone(phone)) {
+                invalidPhones++
+                continue
+            }
+            if (phone in seenPhones) continue
+            seenPhones.add(phone)
+
+            val firstName = when {
+                firstNameColumnIdx != -1 && firstNameColumnIdx < row.size -> row[firstNameColumnIdx].trim()
+                nameColumnIdx != -1 && nameColumnIdx < row.size -> row[nameColumnIdx].trim().split(" ").firstOrNull()
+                else -> null
+            }
+            val lastName = when {
+                lastNameColumnIdx != -1 && lastNameColumnIdx < row.size -> row[lastNameColumnIdx].trim()
+                nameColumnIdx != -1 && nameColumnIdx < row.size -> {
+                    val parts = row[nameColumnIdx].trim().split(" ")
+                    if (parts.size > 1) parts.last() else null
+                }
+                else -> null
+            }
             val fullName = when {
                 firstName != null && lastName != null -> "$firstName $lastName"
                 firstName != null -> firstName
