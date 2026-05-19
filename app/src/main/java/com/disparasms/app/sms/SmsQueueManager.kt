@@ -40,6 +40,7 @@ class SmsQueueManager(
     private val scope = CoroutineScope(Dispatchers.IO)
     private var currentJob: Job? = null
     private var sendGeneration = 0L
+    private var pauseUpdateJob: Job? = null
 
     private val _progress = MutableStateFlow<SendProgress?>(null)
     val progress: StateFlow<SendProgress?> = _progress
@@ -160,24 +161,26 @@ class SmsQueueManager(
     fun pauseSending() {
         currentJob?.cancel()
         currentJob = null
-        _progress.value?.let { progress ->
-            scope.launch {
-                campaignRepository.updateProgress(
-                    id = progress.campaignId,
-                    sent = progress.sent,
-                    delivered = progress.delivered,
-                    failed = progress.failed,
-                    pending = progress.pending,
-                    status = com.disparasms.app.data.local.entity.CampaignStatus.PAUSED
-                )
-                _progress.value = _progress.value?.copy(isRunning = false, currentContact = null)
-            }
+        pauseUpdateJob?.cancel()
+        val progress = _progress.value ?: return
+        pauseUpdateJob = scope.launch {
+            campaignRepository.updateProgress(
+                id = progress.campaignId,
+                sent = progress.sent,
+                delivered = progress.delivered,
+                failed = progress.failed,
+                pending = progress.pending,
+                status = com.disparasms.app.data.local.entity.CampaignStatus.PAUSED
+            )
+            _progress.value = _progress.value?.copy(isRunning = false, currentContact = null)
         }
     }
 
     fun stopSending() {
         currentJob?.cancel()
         currentJob = null
+        pauseUpdateJob?.cancel()
+        pauseUpdateJob = null
         _progress.value = null
     }
 }
