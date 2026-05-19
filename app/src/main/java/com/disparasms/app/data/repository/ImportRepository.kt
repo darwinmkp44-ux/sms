@@ -216,7 +216,7 @@ class ImportRepository @Inject constructor(
                 val result = when {
                     fileName.endsWith(".csv", true) -> importCsvStream(stream, groupId, columnMapping, hasHeader, onProgress)
                     fileName.endsWith(".xlsx", true) || fileName.endsWith(".xls", true) ->
-                        importExcel(stream, groupId, columnMapping, hasHeader, onProgress)
+                        importExcelStreaming(stream, groupId, columnMapping, hasHeader)
                     fileName.endsWith(".txt", true) -> importTxtStream(stream, groupId, onProgress)
                     else -> ImportResult(errors = listOf("Formato de ficheiro não suportado"))
                 }
@@ -231,6 +231,88 @@ class ImportRepository @Inject constructor(
         } catch (e: Exception) {
             ImportResult(errors = listOf("Erro: ${e.message}"))
         }
+    }
+
+    private fun importExcelStreaming(
+        stream: InputStream,
+        groupId: Long?,
+        columnMapping: Map<String, String>,
+        hasHeader: Boolean
+    ): ImportResult {
+        val contacts = mutableListOf<ContactEntity>()
+        val seenPhones = mutableSetOf<String>()
+        var invalidPhones = 0
+        var phoneCol = -1
+        var firstNameCol = -1
+        var lastNameCol = -1
+        var nameCol = -1
+        var detected = false
+
+        StreamingExcelReader(stream) { row, rowNum ->
+            if (!detected && hasHeader) {
+                val mapping = if (columnMapping.isEmpty()) autoDetectColumns(row) else columnMapping
+                phoneCol = findColumnIndex(row, mapping, "phone")
+                firstNameCol = findColumnIndex(row, mapping, "first_name")
+                lastNameCol = findColumnIndex(row, mapping, "last_name")
+                nameCol = findColumnIndex(row, mapping, "name")
+                detected = true
+                return@StreamingExcelReader
+            }
+            if (hasHeader && !detected) return@StreamingExcelReader
+            if (!hasHeader && !detected) {
+                val mapping = autoDetectColumns(emptyList())
+                phoneCol = 0
+                detected = true
+            }
+            if (phoneCol == -1) return@StreamingExcelReader
+            if (phoneCol >= row.size) return@StreamingExcelReader
+
+            val rawPhone = row[phoneCol].trim()
+            val phone = PhoneUtils.clean(rawPhone)
+
+            if (phone.isEmpty() || !PhoneUtils.isValidMzPhone(phone)) {
+                invalidPhones++
+                return@StreamingExcelReader
+            }
+            if (phone in seenPhones) return@StreamingExcelReader
+            seenPhones.add(phone)
+
+            val firstName = when {
+                firstNameCol != -1 && firstNameCol < row.size -> row[firstNameCol].trim()
+                nameCol != -1 && nameCol < row.size -> row[nameCol].trim().split(" ").firstOrNull()
+                else -> null
+            }
+            val lastName = when {
+                lastNameCol != -1 && lastNameCol < row.size -> row[lastNameCol].trim()
+                nameCol != -1 && nameCol < row.size -> {
+                    val parts = row[nameCol].trim().split(" ")
+                    if (parts.size > 1) parts.last() else null
+                }
+                else -> null
+            }
+            val fullName = when {
+                firstName != null && lastName != null -> "$firstName $lastName"
+                firstName != null -> firstName
+                else -> phone
+            }
+
+            contacts.add(ContactEntity(
+                groupId = groupId,
+                phone = phone,
+                firstName = firstName,
+                lastName = lastName,
+                fullName = fullName,
+                importedFrom = "excel"
+            ))
+        }.read()
+
+        return ImportResult(
+            totalFound = contacts.size + invalidPhones + seenPhones.size,
+            imported = 0,
+            skipped = seenPhones.size,
+            invalidPhones = invalidPhones,
+            contacts = contacts
+        )
     }
 
     private suspend fun importCsvStream(
