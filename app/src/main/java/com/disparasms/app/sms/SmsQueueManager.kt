@@ -35,7 +35,16 @@ class SmsQueueManager(
         private const val CHUNK_SIZE = 5
         private const val CHUNK_DELAY_MS = 3000L
         private const val PER_MESSAGE_DELAY_MS = 1500L
+        private const val MAX_FAILED_RETRIES = 3
+        private val RETRY_BACKOFF_MS = longArrayOf(5000L, 15000L, 45000L)
     }
+
+    private data class RetryEntry(
+        val logId: Long,
+        val phone: String,
+        val message: String,
+        val simSlot: Int
+    )
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private var currentJob: Job? = null
@@ -78,6 +87,8 @@ class SmsQueueManager(
 
                 campaignRepository.updateStatus(campaignId, com.disparasms.app.data.local.entity.CampaignStatus.SENDING)
 
+                val retryQueue = mutableListOf<RetryEntry>()
+
                 val chunks = logs.chunked(CHUNK_SIZE)
                 for ((chunkIndex, chunk) in chunks.withIndex()) {
                     for (log in chunk) {
@@ -97,6 +108,7 @@ class SmsQueueManager(
                         } else {
                             campaignRepository.markLogFailed(log.id, result.error)
                             failed++
+                            retryQueue.add(RetryEntry(log.id, phone, log.message, simSlot))
                             Log.w(TAG, "Failed to send to ${log.phone}: ${result.error}")
                         }
 
@@ -122,6 +134,31 @@ class SmsQueueManager(
                     if (chunkIndex < chunks.size - 1) {
                         delay(CHUNK_DELAY_MS)
                     }
+                }
+
+                // Retry failed messages with exponential backoff
+                var retryRound = 0
+                while (retryQueue.isNotEmpty() && retryRound < MAX_FAILED_RETRIES && isActive) {
+                    _progress.value = _progress.value?.copy(
+                        currentContact = "Retentativa ${retryRound + 1}/$MAX_FAILED_RETRIES (${retryQueue.size} msg)"
+                    )
+                    delay(RETRY_BACKOFF_MS[retryRound])
+
+                    val iterator = retryQueue.iterator()
+                    while (iterator.hasNext()) {
+                        if (!isActive) break
+                        val entry = iterator.next()
+                        val result = smsSender.sendSms(entry.phone, entry.message, entry.simSlot)
+                        if (result.success) {
+                            campaignRepository.markLogDelivered(entry.logId)
+                            sent++
+                            delivered++
+                            failed--
+                            iterator.remove()
+                        }
+                        delay(customDelayMs)
+                    }
+                    retryRound++
                 }
 
                 val finalStatus = if (failed > 0) {

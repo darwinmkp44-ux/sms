@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class DelayUnit { MS, S }
+
 data class CreateCampaignUiState(
     val name: String = "",
     val message: String = "",
@@ -26,13 +28,20 @@ data class CreateCampaignUiState(
     val selectedContactIds: List<Long> = emptyList(),
     val groups: List<GroupEntity> = emptyList(),
     val simSlot: Int = 0,
-    val delayMs: Long = 1500L,
+    val delayValue: String = "1500",
+    val delayUnit: DelayUnit = DelayUnit.MS,
     val estimatedSmsCount: Int = 0,
     val estimatedParts: Int = 1,
     val totalRecipients: Int = 0,
     val isLoading: Boolean = false,
     val simSlots: List<SimInfo> = emptyList()
-)
+) {
+    val delayMs: Long
+        get() = when (delayUnit) {
+            DelayUnit.MS -> delayValue.toLongOrNull() ?: 0L
+            DelayUnit.S -> (delayValue.toLongOrNull() ?: 0L) * 1000L
+        }
+}
 
 @HiltViewModel
 class CreateCampaignViewModel @Inject constructor(
@@ -84,8 +93,14 @@ class CreateCampaignViewModel @Inject constructor(
         updateState { it.copy(simSlot = slot) }
     }
 
-    fun setDelayMs(delay: Long) {
-        updateState { it.copy(delayMs = delay) }
+    fun setDelayValue(value: String) {
+        if (value.isEmpty() || value.all { it.isDigit() }) {
+            updateState { it.copy(delayValue = value) }
+        }
+    }
+
+    fun setDelayUnit(unit: DelayUnit) {
+        updateState { it.copy(delayUnit = unit) }
     }
 
     fun createCampaign(onComplete: (Long) -> Unit) {
@@ -101,7 +116,7 @@ class CreateCampaignViewModel @Inject constructor(
                 contactIds = emptyList(),
                 totalContacts = state.totalRecipients,
                 simSlot = state.simSlot,
-                delayMs = state.delayMs
+                delayMs = state.delayMs.coerceIn(100L, 60000L)
             )
 
             val contacts = mutableListOf<ContactEntity>()
