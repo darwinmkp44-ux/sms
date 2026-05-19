@@ -1,4 +1,4 @@
-name: Build Debug APK
+name: Build APKs
 
 on:
   push:
@@ -24,11 +24,21 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build with Gradle
+      - name: Build debug APK
         run: ./gradlew assembleDebug
 
-      - name: Upload APK
+      - name: Build release APK
+        run: ./gradlew assembleRelease
+
+      - name: Copy and rename APKs
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk "Dispara SMS debug.apk"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "Dispara SMS.apk"
+
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: dispara-sms-apks
+          path: |
+            Dispara SMS debug.apk
+            Dispara SMS.apk
