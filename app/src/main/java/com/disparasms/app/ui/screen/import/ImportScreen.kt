@@ -6,7 +6,6 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,7 +27,6 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -74,16 +72,16 @@ import kotlinx.coroutines.withContext
 @Composable
 fun ImportScreen(navController: NavController, groupId: Long? = null) {
     var mode by remember { mutableStateOf<String?>(null) }
-    var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedFileName by remember { mutableStateOf<String?>(null) }
+    var selectedUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var selectedFileNames by remember { mutableStateOf<List<String>>(emptyList()) }
     var isImporting by remember { mutableStateOf(false) }
     var importResult by remember { mutableStateOf<ImportResult?>(null) }
     var importProgress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-
+    var totalFiles by remember { mutableStateOf(0) }
+    var currentFileIndex by remember { mutableStateOf(0) }
     var manualPhone by remember { mutableStateOf("") }
     var manualName by remember { mutableStateOf("") }
     var manualPhoneError by remember { mutableStateOf<String?>(null) }
-    var manualContacts by remember { mutableStateOf<List<ContactEntity>>(emptyList()) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -101,13 +99,13 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
     }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri?.let {
-            selectedFileUri = it
-            selectedFileName = it.lastPathSegment
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            selectedUris = uris
+            selectedFileNames = uris.mapNotNull { it.lastPathSegment }
+            mode = "file"
         }
-        mode = "file"
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -233,14 +231,6 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
                                         )
                                     }
                                 }
-                                if (manualContacts.isNotEmpty()) {
-                                    Spacer(Modifier.height(Spacing.sm))
-                                    Text(
-                                        text = "${manualContacts.size} adicionados manualmente",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
                             }
                         }
                     }
@@ -309,7 +299,7 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
                                 )
                                 Spacer(Modifier.height(Spacing.sm))
                                 Text(
-                                    text = "Excel, CSV ou TXT",
+                                    text = "Excel, CSV ou TXT (vários ficheiros)",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center
@@ -317,17 +307,11 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
                                 Spacer(Modifier.height(Spacing.lg))
                                 Button(
                                     onClick = {
-                                        filePickerLauncher.launch(arrayOf(
-                                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                            "application/vnd.ms-excel",
-                                            "text/csv",
-                                            "text/comma-separated-values",
-                                            "text/plain"
-                                        ))
+                                        filePickerLauncher.launch(arrayOf("*/*"))
                                     },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("Seleccionar")
+                                    Text("Seleccionar Ficheiros")
                                 }
                             }
                         }
@@ -396,7 +380,7 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
                     contentPadding = PaddingValues(Spacing.lg),
                     verticalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
-                    if (selectedFileUri == null) {
+                    if (selectedUris.isEmpty()) {
                         item {
                             ModernCard(modifier = Modifier.fillMaxWidth()) {
                                 Column(
@@ -412,7 +396,7 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
                                         modifier = Modifier.padding(bottom = Spacing.md)
                                     )
                                     Text(
-                                        text = "Seleccionar ficheiro Excel, CSV ou TXT",
+                                        text = "Seleccionar ficheiros Excel, CSV ou TXT",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         textAlign = TextAlign.Center
@@ -427,23 +411,24 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
                                     Spacer(Modifier.height(Spacing.lg))
                                     Button(
                                         onClick = {
-                                            filePickerLauncher.launch(arrayOf(
-                                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                                "application/vnd.ms-excel",
-                                                "text/csv",
-                                                "text/comma-separated-values",
-                                                "text/plain"
-                                            ))
+                                            filePickerLauncher.launch(arrayOf("*/*"))
                                         }
                                     ) {
                                         Icon(Icons.Default.TableChart, contentDescription = null)
-                                        Text("Escolher Ficheiro", modifier = Modifier.padding(start = 8.dp))
+                                        Text("Escolher Ficheiros", modifier = Modifier.padding(start = 8.dp))
                                     }
                                 }
                             }
                         }
                     } else {
                         item {
+                            Text(
+                                text = "${selectedUris.size} ficheiro(s) seleccionado(s)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        items(selectedUris.mapIndexed { i, uri -> uri to (selectedFileNames.getOrElse(i) { "Ficheiro ${i+1}" }) }) { (uri, name) ->
                             ModernCard(modifier = Modifier.fillMaxWidth()) {
                                 Row(
                                     modifier = Modifier
@@ -458,41 +443,91 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
                                     )
                                     Column(modifier = Modifier.weight(1f).padding(horizontal = Spacing.md)) {
                                         Text(
-                                            text = selectedFileName ?: "Ficheiro seleccionado",
+                                            text = name,
                                             style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Medium
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1
                                         )
                                     }
                                 }
                             }
                         }
 
-                        item {
-                            Spacer(Modifier.height(Spacing.md))
-                            Button(
-                                onClick = {
-                                    val uri = selectedFileUri ?: return@Button
-                                    isImporting = true
-                                    scope.launch {
-                                        val result = withContext(Dispatchers.IO) {
-                                            importRepository.importFromUri(uri, groupId = groupId)
-                                        }
-                                        importResult = result
-                                        isImporting = false
+                        if (isImporting) {
+                            item {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    if (totalFiles > 1) {
+                                        Text(
+                                            text = "Ficheiro ${currentFileIndex + 1} de $totalFiles",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(Modifier.height(Spacing.sm))
                                     }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = !isImporting
-                            ) {
-                                if (isImporting) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp
+                                    LinearProgressIndicator(
+                                        progress = {
+                                            if (importProgress != null && importProgress!!.second > 0)
+                                                importProgress!!.first.toFloat() / importProgress!!.second.toFloat()
+                                            else 0f
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
                                     )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("A importar...")
-                                } else {
-                                    Text("Importar Contactos")
+                                    Spacer(Modifier.height(Spacing.sm))
+                                    Text(
+                                        text = if (importProgress != null)
+                                            "${importProgress!!.first} de ${importProgress!!.second} contactos"
+                                        else "A importar...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        } else {
+                            item {
+                                Spacer(Modifier.height(Spacing.md))
+                                Button(
+                                    onClick = {
+                                        isImporting = true
+                                        totalFiles = selectedUris.size
+                                        currentFileIndex = 0
+                                        scope.launch {
+                                            var combinedResult = ImportResult()
+                                            for ((i, uri) in selectedUris.withIndex()) {
+                                                currentFileIndex = i
+                                                val result = withContext(Dispatchers.IO) {
+                                                    importRepository.importFromUri(uri, groupId) { current, total ->
+                                                        importProgress = current to total
+                                                    }
+                                                }
+                                                combinedResult = combinedResult.copy(
+                                                    imported = combinedResult.imported + result.imported,
+                                                    skipped = combinedResult.skipped + result.skipped,
+                                                    invalidPhones = combinedResult.invalidPhones + result.invalidPhones,
+                                                    totalFound = combinedResult.totalFound + result.totalFound,
+                                                    errors = combinedResult.errors + result.errors
+                                                )
+                                            }
+                                            importResult = combinedResult
+                                            isImporting = false
+                                            importProgress = null
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !isImporting
+                                ) {
+                                    if (isImporting) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(20.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("A importar...")
+                                    } else {
+                                        Text("Importar ${selectedUris.size} ficheiro(s)")
+                                    }
                                 }
                             }
                         }
@@ -506,17 +541,17 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
                 onDismissRequest = { importResult = null },
                 icon = {
                     Icon(
-                        imageVector = if (result.errors.isEmpty()) Icons.Default.CheckCircle else Icons.Default.Error,
+                        imageVector = if (result.errors.isEmpty() || result.errors.all { it.isEmpty() }) Icons.Default.CheckCircle else Icons.Default.Error,
                         contentDescription = null,
-                        tint = if (result.errors.isEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        tint = if (result.errors.isEmpty() || result.errors.all { it.isEmpty() }) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                     )
                 },
                 title = {
-                    Text(if (result.errors.isEmpty()) "Importação concluída" else "Erro na importação")
+                    Text(if (result.errors.isEmpty() || result.errors.all { it.isEmpty() }) "Importação concluída" else "Erro na importação")
                 },
                 text = {
-                    if (result.errors.isNotEmpty()) {
-                        Text(result.errors.joinToString("\n"))
+                    if (result.errors.isNotEmpty() && result.errors.any { it.isNotEmpty() }) {
+                        Text(result.errors.filter { it.isNotEmpty() }.joinToString("\n"))
                     } else {
                         Text("${result.imported} contactos importados com sucesso.\n${result.skipped} ignorados.\n${result.invalidPhones} inválidos.")
                     }
@@ -524,7 +559,7 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
                 confirmButton = {
                     TextButton(onClick = {
                         importResult = null
-                        if (result.errors.isEmpty()) {
+                        if (result.errors.isEmpty() || result.errors.all { it.isEmpty() }) {
                             navController.popBackStack()
                         } else {
                             mode = null

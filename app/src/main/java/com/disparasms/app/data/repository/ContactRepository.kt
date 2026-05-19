@@ -61,6 +61,14 @@ class ContactRepository(private val contactDao: ContactDao) {
     suspend fun importContacts(contacts: List<ContactEntity>): Pair<Int, Int> {
         if (contacts.isEmpty()) return Pair(0, 0)
         val existingPhones = contactDao.getPhonesWithoutGroup().toSet()
+        return importContactsWithExisting(contacts, existingPhones)
+    }
+
+    suspend fun importContactsWithExisting(
+        contacts: List<ContactEntity>,
+        existingPhones: Set<String>
+    ): Pair<Int, Int> {
+        if (contacts.isEmpty()) return Pair(0, 0)
         val newContacts = contacts.filter { it.groupId != null || it.phone !in existingPhones }
         if (newContacts.isEmpty()) return Pair(0, contacts.size)
         val ids = contactDao.insertAll(newContacts)
