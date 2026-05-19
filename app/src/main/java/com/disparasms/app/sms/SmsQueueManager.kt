@@ -160,6 +160,19 @@ class SmsQueueManager(
     fun pauseSending() {
         currentJob?.cancel()
         currentJob = null
+        _progress.value?.let { progress ->
+            scope.launch {
+                campaignRepository.updateProgress(
+                    id = progress.campaignId,
+                    sent = progress.sent,
+                    delivered = progress.delivered,
+                    failed = progress.failed,
+                    pending = progress.pending,
+                    status = com.disparasms.app.data.local.entity.CampaignStatus.PAUSED
+                )
+                _progress.value = _progress.value?.copy(isRunning = false, currentContact = null)
+            }
+        }
     }
 
     fun stopSending() {
