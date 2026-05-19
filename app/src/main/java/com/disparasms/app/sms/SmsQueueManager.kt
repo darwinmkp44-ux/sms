@@ -54,17 +54,25 @@ class SmsQueueManager(
         stopSending()
         val generation = ++sendGeneration
 
+        // Read existing counts so resume doesn't start from zero
+        val existing = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+            campaignRepository.getById(campaignId)
+        }
+
         currentJob = scope.launch {
             try {
                 val total = logs.size
-                var sent = 0
-                var delivered = 0
-                var failed = 0
+                var sent = existing?.sentCount ?: 0
+                var delivered = existing?.deliveredCount ?: 0
+                var failed = existing?.failedCount ?: 0
 
                 _progress.value = SendProgress(
                     campaignId = campaignId,
-                    total = total,
+                    total = total + sent + failed,
                     pending = total,
+                    sent = sent,
+                    delivered = delivered,
+                    failed = failed,
                     isRunning = true
                 )
 

@@ -8,7 +8,10 @@ import com.disparasms.app.util.PhoneUtils
 import com.github.doyaaaaaken.kotlincsv.dsl.csvReader
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.apache.poi.ss.usermodel.WorkbookFactory
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -216,7 +219,7 @@ class ImportRepository @Inject constructor(
                 val result = when {
                     fileName.endsWith(".csv", true) -> importCsvStream(stream, groupId, columnMapping, hasHeader, onProgress)
                     fileName.endsWith(".xlsx", true) || fileName.endsWith(".xls", true) ->
-                        importExcelStreaming(stream, groupId, columnMapping, hasHeader)
+                        importExcelAsCsv(stream, groupId, columnMapping, hasHeader)
                     fileName.endsWith(".txt", true) -> importTxtStream(stream, groupId, onProgress)
                     else -> ImportResult(errors = listOf("Formato de ficheiro não suportado"))
                 }
@@ -233,86 +236,41 @@ class ImportRepository @Inject constructor(
         }
     }
 
-    private fun importExcelStreaming(
+    private fun importExcelAsCsv(
         stream: InputStream,
         groupId: Long?,
         columnMapping: Map<String, String>,
         hasHeader: Boolean
     ): ImportResult {
-        val contacts = mutableListOf<ContactEntity>()
-        val seenPhones = mutableSetOf<String>()
-        var invalidPhones = 0
-        var phoneCol = -1
-        var firstNameCol = -1
-        var lastNameCol = -1
-        var nameCol = -1
-        var detected = false
-
-        StreamingExcelReader(stream) { row, rowNum ->
-            if (!detected && hasHeader) {
-                val mapping = if (columnMapping.isEmpty()) autoDetectColumns(row) else columnMapping
-                phoneCol = findColumnIndex(row, mapping, "phone")
-                firstNameCol = findColumnIndex(row, mapping, "first_name")
-                lastNameCol = findColumnIndex(row, mapping, "last_name")
-                nameCol = findColumnIndex(row, mapping, "name")
-                detected = true
-                return@StreamingExcelReader
-            }
-            if (hasHeader && !detected) return@StreamingExcelReader
-            if (!hasHeader && !detected) {
-                val mapping = autoDetectColumns(emptyList())
-                phoneCol = 0
-                detected = true
-            }
-            if (phoneCol == -1) return@StreamingExcelReader
-            if (phoneCol >= row.size) return@StreamingExcelReader
-
-            val rawPhone = row[phoneCol].trim()
-            val phone = PhoneUtils.clean(rawPhone)
-
-            if (phone.isEmpty() || !PhoneUtils.isValidMzPhone(phone)) {
-                invalidPhones++
-                return@StreamingExcelReader
-            }
-            if (phone in seenPhones) return@StreamingExcelReader
-            seenPhones.add(phone)
-
-            val firstName = when {
-                firstNameCol != -1 && firstNameCol < row.size -> row[firstNameCol].trim()
-                nameCol != -1 && nameCol < row.size -> row[nameCol].trim().split(" ").firstOrNull()
-                else -> null
-            }
-            val lastName = when {
-                lastNameCol != -1 && lastNameCol < row.size -> row[lastNameCol].trim()
-                nameCol != -1 && nameCol < row.size -> {
-                    val parts = row[nameCol].trim().split(" ")
-                    if (parts.size > 1) parts.last() else null
-                }
-                else -> null
-            }
-            val fullName = when {
-                firstName != null && lastName != null -> "$firstName $lastName"
-                firstName != null -> firstName
-                else -> phone
-            }
-
-            contacts.add(ContactEntity(
-                groupId = groupId,
-                phone = phone,
-                firstName = firstName,
-                lastName = lastName,
-                fullName = fullName,
-                importedFrom = "excel"
-            ))
+        // Convert Excel rows to a temporary CSV text in memory,
+        // then import through the fast CSV path.
+        val csvBytes = ByteArrayOutputStream()
+        val writer = csvBytes.bufferedWriter()
+        val rowList = mutableListOf<List<String>>()
+        StreamingExcelReader(stream) { row, _ ->
+            rowList.add(row)
         }.read()
+        rowList.forEach { row ->
+            writer.write(row.joinToString(",") { escapeCell(it) })
+            writer.newLine()
+        }
+        writer.flush()
+        val csvStream = ByteArrayInputStream(csvBytes.toByteArray())
 
-        return ImportResult(
-            totalFound = contacts.size + invalidPhones + seenPhones.size,
-            imported = 0,
-            skipped = seenPhones.size,
-            invalidPhones = invalidPhones,
-            contacts = contacts
-        )
+        return try {
+            runBlocking { importCsvStream(csvStream, groupId, columnMapping, hasHeader) { _, _ -> } }
+        } finally {
+            csvStream.close()
+            writer.close()
+        }
+    }
+
+    private fun escapeCell(value: String): String {
+        return if (value.contains(',') || value.contains('"') || value.contains('\n')) {
+            "\"${value.replace("\"", "\"\"")}\""
+        } else {
+            value
+        }
     }
 
     private suspend fun importCsvStream(

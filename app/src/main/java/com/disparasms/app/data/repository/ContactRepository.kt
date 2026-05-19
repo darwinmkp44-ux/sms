@@ -71,8 +71,11 @@ class ContactRepository(private val contactDao: ContactDao) {
         if (contacts.isEmpty()) return Pair(0, 0)
         val newContacts = contacts.filter { it.groupId != null || it.phone !in existingPhones }
         if (newContacts.isEmpty()) return Pair(0, contacts.size)
-        val ids = contactDao.insertAll(newContacts)
-        val imported = ids.count { it > 0 }
+        var imported = 0
+        newContacts.chunked(500).forEach { chunk ->
+            val ids = contactDao.insertAll(chunk)
+            imported += ids.count { it > 0 }
+        }
         val skipped = contacts.size - imported
         return Pair(imported, skipped)
     }
