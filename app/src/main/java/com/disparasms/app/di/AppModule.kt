@@ -30,7 +30,7 @@ object AppModule {
             context,
             AppDatabase::class.java,
             "disparasms.db"
-        ).build()
+        ).fallbackToDestructiveMigration().build()
     }
 
     @Provides fun provideGroupDao(db: AppDatabase): GroupDao = db.groupDao()

@@ -28,19 +28,23 @@ data class CreateCampaignUiState(
     val selectedContactIds: List<Long> = emptyList(),
     val groups: List<GroupEntity> = emptyList(),
     val simSlot: Int = 0,
-    val delayValue: String = "1500",
-    val delayUnit: DelayUnit = DelayUnit.MS,
+    val messagesPerInterval: String = "1",
+    val intervalValue: String = "1000",
+    val intervalUnit: DelayUnit = DelayUnit.MS,
     val estimatedSmsCount: Int = 0,
     val estimatedParts: Int = 1,
     val totalRecipients: Int = 0,
     val isLoading: Boolean = false,
     val simSlots: List<SimInfo> = emptyList()
 ) {
-    val delayMs: Long
-        get() = when (delayUnit) {
-            DelayUnit.MS -> delayValue.toLongOrNull() ?: 0L
-            DelayUnit.S -> (delayValue.toLongOrNull() ?: 0L) * 1000L
+    val intervalMs: Long
+        get() = when (intervalUnit) {
+            DelayUnit.MS -> intervalValue.toLongOrNull() ?: 1000L
+            DelayUnit.S -> (intervalValue.toLongOrNull() ?: 1L) * 1000L
         }
+
+    val messagesPerIntervalInt: Int
+        get() = messagesPerInterval.toIntOrNull() ?: 1
 }
 
 @HiltViewModel
@@ -93,14 +97,20 @@ class CreateCampaignViewModel @Inject constructor(
         updateState { it.copy(simSlot = slot) }
     }
 
-    fun setDelayValue(value: String) {
+    fun setMessagesPerInterval(value: String) {
         if (value.isEmpty() || value.all { it.isDigit() }) {
-            updateState { it.copy(delayValue = value) }
+            updateState { it.copy(messagesPerInterval = value) }
         }
     }
 
-    fun setDelayUnit(unit: DelayUnit) {
-        updateState { it.copy(delayUnit = unit) }
+    fun setIntervalValue(value: String) {
+        if (value.isEmpty() || value.all { it.isDigit() }) {
+            updateState { it.copy(intervalValue = value) }
+        }
+    }
+
+    fun setIntervalUnit(unit: DelayUnit) {
+        updateState { it.copy(intervalUnit = unit) }
     }
 
     fun createCampaign(onComplete: (Long) -> Unit) {
@@ -116,7 +126,8 @@ class CreateCampaignViewModel @Inject constructor(
                 contactIds = emptyList(),
                 totalContacts = state.totalRecipients,
                 simSlot = state.simSlot,
-                delayMs = state.delayMs.coerceIn(100L, 60000L)
+                messagesPerInterval = state.messagesPerIntervalInt.coerceAtLeast(1),
+                intervalMs = state.intervalMs.coerceIn(100L, 3600000L)
             )
 
             val contacts = mutableListOf<ContactEntity>()

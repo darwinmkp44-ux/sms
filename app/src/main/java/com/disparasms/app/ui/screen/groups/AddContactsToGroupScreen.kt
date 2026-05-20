@@ -80,8 +80,6 @@ fun AddContactsToGroupScreen(navController: NavController) {
 
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var isSaving by remember { mutableStateOf(false) }
-    var manualPhone by remember { mutableStateOf("") }
-    var manualPhoneError by remember { mutableStateOf<String?>(null) }
 
     val allContacts by contactRepository.observeAll()
         .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -131,66 +129,7 @@ fun AddContactsToGroupScreen(navController: NavController) {
             contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            // Manual input card
-            item {
-                ModernCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(Spacing.md)) {
-                        Text(
-                            text = "Adicionar manualmente",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(Spacing.sm))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.Top,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-                        ) {
-                            OutlinedTextField(
-                                value = manualPhone,
-                                onValueChange = {
-                                    manualPhone = it
-                                    manualPhoneError = null
-                                },
-                                modifier = Modifier.weight(1f),
-                                placeholder = { Text("+258XXXXXXXX") },
-                                singleLine = true,
-                                isError = manualPhoneError != null,
-                                supportingText = manualPhoneError?.let { { Text(it) } }
-                            )
-                            IconButton(
-                                onClick = {
-                                    val phone = PhoneUtils.clean(manualPhone)
-                                    if (phone.isEmpty()) {
-                                        manualPhoneError = "Número inválido"
-                                        return@IconButton
-                                    }
-                                    if (!PhoneUtils.isValidMzPhone(phone)) {
-                                        manualPhoneError = "Número Moçambicano inválido"
-                                        return@IconButton
-                                    }
-                                    manualPhoneError = null
-                                    manualPhone = ""
-                                    scope.launch {
-                                        withContext(Dispatchers.IO) {
-                                            contactRepository.insert(
-                                                ContactEntity(phone = phone, fullName = phone)
-                                            )
-                                        }
-                                    }
-                                },
-                                enabled = manualPhone.isNotBlank()
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Adicionar contacto",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+
 
             if (allContacts.isEmpty()) {
                 item {

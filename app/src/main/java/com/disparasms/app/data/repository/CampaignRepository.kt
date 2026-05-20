@@ -29,7 +29,8 @@ class CampaignRepository(
         contactIds: List<Long>,
         totalContacts: Int,
         simSlot: Int,
-        delayMs: Long
+        messagesPerInterval: Int,
+        intervalMs: Long
     ): Long {
         val campaign = CampaignEntity(
             name = name,
@@ -39,7 +40,8 @@ class CampaignRepository(
             totalContacts = totalContacts,
             pendingCount = totalContacts,
             simSlot = simSlot,
-            delayMs = delayMs
+            messagesPerInterval = messagesPerInterval,
+            intervalMs = intervalMs
         )
         return campaignDao.insert(campaign)
     }

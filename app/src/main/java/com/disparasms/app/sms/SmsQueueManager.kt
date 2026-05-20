@@ -58,7 +58,8 @@ class SmsQueueManager(
         campaignId: Long,
         logs: List<CampaignLogEntity>,
         simSlot: Int,
-        customDelayMs: Long = PER_MESSAGE_DELAY_MS
+        messagesPerInterval: Int = 1,
+        intervalMs: Long = 1000L
     ) {
         stopSending()
         val generation = ++sendGeneration
@@ -89,7 +90,7 @@ class SmsQueueManager(
 
                 val retryQueue = mutableListOf<RetryEntry>()
 
-                val chunks = logs.chunked(CHUNK_SIZE)
+                val chunks = logs.chunked(messagesPerInterval.coerceAtLeast(1))
                 for ((chunkIndex, chunk) in chunks.withIndex()) {
                     for (log in chunk) {
                         if (!isActive) break
@@ -119,7 +120,9 @@ class SmsQueueManager(
                             pending = total - sent - failed
                         )
 
-                        delay(customDelayMs)
+                        // A very small safety pause between sequential sends in the same burst (e.g., 50ms)
+                        // so Android's SMS queue doesn't reject them due to overlapping asynchronous calls.
+                        delay(50L)
                     }
 
                     campaignRepository.updateProgress(
@@ -131,8 +134,10 @@ class SmsQueueManager(
                         status = com.disparasms.app.data.local.entity.CampaignStatus.SENDING
                     )
 
-                    if (chunkIndex < chunks.size - 1) {
-                        delay(CHUNK_DELAY_MS)
+                    if (chunkIndex < chunks.size - 1 && isActive) {
+                        val safetyDelayTotal = 50L * chunk.size
+                        val remainingDelay = (intervalMs - safetyDelayTotal).coerceAtLeast(0L)
+                        delay(remainingDelay)
                     }
                 }
 
@@ -156,7 +161,7 @@ class SmsQueueManager(
                             failed--
                             iterator.remove()
                         }
-                        delay(customDelayMs)
+                        delay(100L) // A small delay between retries
                     }
                     retryRound++
                 }

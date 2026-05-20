@@ -66,7 +66,7 @@ class CampaignDetailViewModel @Inject constructor(
             val logs = campaignRepository.getLogsByCampaignAndStatus(
                 campaignId, CampaignLogStatus.PENDING
             )
-            smsQueueManager.startSending(campaignId, logs, campaign.simSlot, campaign.delayMs)
+            smsQueueManager.startSending(campaignId, logs, campaign.simSlot, campaign.messagesPerInterval, campaign.intervalMs)
         }
     }
 

@@ -234,39 +234,75 @@ fun CreateCampaignScreen(
                 Spacer(Modifier.height(Spacing.md))
 
                 Text(
-                    text = "Intervalo entre mensagens",
-                    style = MaterialTheme.typography.bodyMedium
+                    text = "Taxa de Envio (Limite)",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
                 )
-                Spacer(Modifier.height(Spacing.sm))
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    text = "Configure o limite de mensagens enviadas por intervalo de tempo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(Spacing.md))
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
-                        value = state.delayValue,
-                        onValueChange = { viewModel.setDelayValue(it) },
-                        modifier = Modifier.weight(1f),
+                        value = state.messagesPerInterval,
+                        onValueChange = { viewModel.setMessagesPerInterval(it) },
+                        modifier = Modifier.weight(1.2f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
-                        placeholder = { Text("1500") }
+                        label = { Text("Mensagens") },
+                        placeholder = { Text("1") }
+                    )
+                    
+                    Spacer(Modifier.width(Spacing.sm))
+                    Text(
+                        text = "a cada",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     )
                     Spacer(Modifier.width(Spacing.sm))
-                    DelayUnitButton(
-                        label = "ms",
-                        selected = state.delayUnit == DelayUnit.MS,
-                        onClick = { viewModel.setDelayUnit(DelayUnit.MS) }
+
+                    OutlinedTextField(
+                        value = state.intervalValue,
+                        onValueChange = { viewModel.setIntervalValue(it) },
+                        modifier = Modifier.weight(1.5f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        label = { Text("Intervalo") },
+                        placeholder = { Text("1000") }
                     )
-                    Spacer(Modifier.width(4.dp))
-                    DelayUnitButton(
-                        label = "s",
-                        selected = state.delayUnit == DelayUnit.S,
-                        onClick = { viewModel.setDelayUnit(DelayUnit.S) }
-                    )
+                    
+                    Spacer(Modifier.width(Spacing.sm))
+                    
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        DelayUnitButton(
+                            label = "ms",
+                            selected = state.intervalUnit == DelayUnit.MS,
+                            onClick = { viewModel.setIntervalUnit(DelayUnit.MS) }
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        DelayUnitButton(
+                            label = "s",
+                            selected = state.intervalUnit == DelayUnit.S,
+                            onClick = { viewModel.setIntervalUnit(DelayUnit.S) }
+                        )
+                    }
                 }
-                if (state.delayValue.isNotBlank()) {
-                    Spacer(Modifier.height(4.dp))
+                
+                if (state.messagesPerInterval.isNotBlank() && state.intervalValue.isNotBlank()) {
+                    Spacer(Modifier.height(Spacing.sm))
+                    val totalSeconds = (state.intervalMs * (state.totalRecipients.toFloat() / state.messagesPerIntervalInt.coerceAtLeast(1))).toLong() / 1000
                     Text(
-                        text = "~${state.delayMs}ms por mensagem | ${state.delayMs * state.totalRecipients}ms total",
+                        text = "${state.messagesPerIntervalInt} mensagens a cada ${state.intervalMs}ms | Tempo total estimado: ~${totalSeconds}s",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

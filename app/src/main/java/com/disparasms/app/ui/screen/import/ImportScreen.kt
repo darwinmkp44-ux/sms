@@ -79,9 +79,7 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
     var importProgress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var totalFiles by remember { mutableStateOf(0) }
     var currentFileIndex by remember { mutableStateOf(0) }
-    var manualPhone by remember { mutableStateOf("") }
-    var manualName by remember { mutableStateOf("") }
-    var manualPhoneError by remember { mutableStateOf<String?>(null) }
+
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -164,76 +162,7 @@ fun ImportScreen(navController: NavController, groupId: Long? = null) {
                     contentPadding = PaddingValues(Spacing.lg),
                     verticalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
-                    // Manual input card
-                    item {
-                        ModernCard(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(Spacing.lg)) {
-                                Text(
-                                    text = "Adicionar manualmente",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(Modifier.height(Spacing.sm))
-                                OutlinedTextField(
-                                    value = manualName,
-                                    onValueChange = { manualName = it },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    placeholder = { Text("Nome (opcional)") },
-                                    singleLine = true
-                                )
-                                Spacer(Modifier.height(Spacing.sm))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.Top,
-                                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-                                ) {
-                                    OutlinedTextField(
-                                        value = manualPhone,
-                                        onValueChange = {
-                                            manualPhone = it
-                                            manualPhoneError = null
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        placeholder = { Text("+258XXXXXXXX") },
-                                        singleLine = true,
-                                        isError = manualPhoneError != null,
-                                        supportingText = manualPhoneError?.let { { Text(it) } }
-                                    )
-                                    IconButton(
-                                        onClick = {
-                                            val phone = PhoneUtils.clean(manualPhone)
-                                            if (phone.isEmpty()) {
-                                                manualPhoneError = "Número inválido"
-                                                return@IconButton
-                                            }
-                                            if (!PhoneUtils.isValidMzPhone(phone)) {
-                                                manualPhoneError = "Número Moçambicano inválido"
-                                                return@IconButton
-                                            }
-                                            manualPhoneError = null
-                                            val name = manualName.ifBlank { phone }
-                                            manualPhone = ""
-                                            manualName = ""
-                                            scope.launch {
-                                                withContext(Dispatchers.IO) {
-                                                    contactRepository.insert(
-                                                        ContactEntity(phone = phone, fullName = name)
-                                                    )
-                                                }
-                                            }
-                                        },
-                                        enabled = manualPhone.isNotBlank()
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Add,
-                                            contentDescription = "Adicionar contacto",
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+
 
                     // Import from Phone
                     item {

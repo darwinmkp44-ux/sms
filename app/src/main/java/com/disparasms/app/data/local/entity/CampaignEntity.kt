@@ -27,8 +27,10 @@ data class CampaignEntity(
     val status: String = CampaignStatus.PENDING,
     @ColumnInfo(name = "sim_slot")
     val simSlot: Int = 0,
-    @ColumnInfo(name = "delay_ms")
-    val delayMs: Long = 1000L,
+    @ColumnInfo(name = "messages_per_interval")
+    val messagesPerInterval: Int = 1,
+    @ColumnInfo(name = "interval_ms")
+    val intervalMs: Long = 1000L,
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "updated_at")
