@@ -8,3 +8,5 @@
 
 -dontwarn org.apache.poi.**
 -dontwarn com.fasterxml.jackson.**
+-dontwarn org.osgi.**
+-dontwarn org.apache.logging.log4j.**

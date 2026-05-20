@@ -33,7 +33,7 @@ jobs:
       - name: Copy and rename APKs
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk "Dispara SMS debug.apk"
-          cp app/build/outputs/apk/release/app-release-unsigned.apk "Dispara SMS.apk"
+          cp app/build/outputs/apk/release/app-release.apk "Dispara SMS.apk"
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4
