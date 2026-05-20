@@ -3,8 +3,13 @@ name: Build APKs
 on:
   push:
     branches: [main]
+    tags:
+      - 'v*'
   pull_request:
     branches: [main]
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -35,10 +40,21 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk "Dispara SMS debug.apk"
           cp app/build/outputs/apk/release/app-release.apk "Dispara SMS.apk"
 
-      - name: Upload APKs
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dispara-sms-apks
           path: |
             Dispara SMS debug.apk
             Dispara SMS.apk
+
+      - name: Create Release and Upload APKs
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Dispara SMS debug.apk
+            Dispara SMS.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
