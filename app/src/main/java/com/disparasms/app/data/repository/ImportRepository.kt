@@ -369,23 +369,147 @@ class ImportRepository @Inject constructor(
         val text = stream.bufferedReader().readText()
         val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
 
+        if (lines.isEmpty()) {
+            return ImportResult(totalFound = 0)
+        }
+
+        // 1. Detect if the text file is delimited
+        val testLines = lines.take(10)
+        val candidateDelimiters = listOf(';', ',', '\t')
+        var detectedDelimiter: Char? = null
+
+        for (delim in candidateDelimiters) {
+            val matchingLines = testLines.count { it.contains(delim) }
+            if (matchingLines >= 0.8 * testLines.size && testLines.size > 0) {
+                val avgColumns = testLines.map { it.split(delim).size }.average()
+                if (avgColumns >= 2.0) {
+                    detectedDelimiter = delim
+                    break
+                }
+            }
+        }
+
         var invalidPhones = 0
         val seenPhones = mutableSetOf<String>()
+        val contacts = mutableListOf<ContactEntity>()
 
-        val contacts = lines.mapNotNull { line ->
-            val phone = PhoneUtils.clean(line)
-            if (phone.isEmpty() || !PhoneUtils.isValidMzPhone(phone)) {
-                invalidPhones++
-                return@mapNotNull null
+        if (detectedDelimiter != null) {
+            // Delimited TXT
+            // 2. Detect if there is a header
+            val firstLineParts = lines.first().split(detectedDelimiter).map { it.trim().lowercase() }
+            val hasHeader = firstLineParts.any { part ->
+                PHONE_ALIASES.any { alias -> part == alias || part.contains(alias) } ||
+                NAME_ALIASES.any { alias -> part == alias || part.contains(alias) } ||
+                FIRST_NAME_ALIASES.any { alias -> part == alias || part.contains(alias) } ||
+                LAST_NAME_ALIASES.any { alias -> part == alias || part.contains(alias) }
             }
-            if (phone in seenPhones) return@mapNotNull null
-            seenPhones.add(phone)
-            ContactEntity(
-                groupId = groupId,
-                phone = phone,
-                fullName = phone,
-                importedFrom = "txt"
-            )
+
+            var phoneCol = -1
+            var firstNameCol = -1
+            var lastNameCol = -1
+            var nameCol = -1
+
+            if (hasHeader) {
+                val headerRow = lines.first().split(detectedDelimiter).map { it.trim() }
+                val mapping = autoDetectColumns(headerRow)
+                phoneCol = findColumnIndex(headerRow, mapping, "phone")
+                firstNameCol = findColumnIndex(headerRow, mapping, "first_name")
+                lastNameCol = findColumnIndex(headerRow, mapping, "last_name")
+                nameCol = findColumnIndex(headerRow, mapping, "name")
+            } else {
+                val firstLineOriginalParts = lines.first().split(detectedDelimiter).map { it.trim() }
+                if (firstLineOriginalParts.size >= 2) {
+                    val clean0 = PhoneUtils.clean(firstLineOriginalParts[0])
+                    val clean1 = PhoneUtils.clean(firstLineOriginalParts[1])
+                    val is0Phone = PhoneUtils.isValidMzPhone(clean0)
+                    val is1Phone = PhoneUtils.isValidMzPhone(clean1)
+
+                    if (is1Phone && !is0Phone) {
+                        phoneCol = 1
+                        nameCol = 0
+                    } else {
+                        phoneCol = 0
+                        nameCol = 1
+                    }
+                } else {
+                    phoneCol = 0
+                }
+            }
+
+            if (phoneCol == -1) {
+                phoneCol = 0
+            }
+
+            val dataLines = if (hasHeader) lines.drop(1) else lines
+
+            for (line in dataLines) {
+                val parts = line.split(detectedDelimiter).map { it.trim() }
+                if (phoneCol >= parts.size) {
+                    invalidPhones++
+                    continue
+                }
+
+                val rawPhone = parts[phoneCol]
+                val phone = PhoneUtils.clean(rawPhone)
+
+                if (phone.isEmpty() || !PhoneUtils.isValidMzPhone(phone)) {
+                    invalidPhones++
+                    continue
+                }
+                if (phone in seenPhones) continue
+                seenPhones.add(phone)
+
+                val firstName = when {
+                    firstNameCol != -1 && firstNameCol < parts.size -> parts[firstNameCol]
+                    nameCol != -1 && nameCol < parts.size -> parts[nameCol].split(" ").firstOrNull()
+                    else -> null
+                }
+                val lastName = when {
+                    lastNameCol != -1 && lastNameCol < parts.size -> parts[lastNameCol]
+                    nameCol != -1 && nameCol < parts.size -> {
+                        val partsList = parts[nameCol].split(" ")
+                        if (partsList.size > 1) partsList.last() else null
+                    }
+                    else -> null
+                }
+                val fullName = when {
+                    firstName != null && lastName != null -> "$firstName $lastName"
+                    firstName != null -> firstName
+                    nameCol != -1 && nameCol < parts.size && parts[nameCol].isNotEmpty() -> parts[nameCol]
+                    else -> phone
+                }
+
+                contacts.add(
+                    ContactEntity(
+                        groupId = groupId,
+                        phone = phone,
+                        firstName = firstName,
+                        lastName = lastName,
+                        fullName = fullName,
+                        importedFrom = "txt"
+                    )
+                )
+            }
+        } else {
+            // Raw single column TXT
+            for (line in lines) {
+                val phone = PhoneUtils.clean(line)
+                if (phone.isEmpty() || !PhoneUtils.isValidMzPhone(phone)) {
+                    invalidPhones++
+                    continue
+                }
+                if (phone in seenPhones) continue
+                seenPhones.add(phone)
+
+                contacts.add(
+                    ContactEntity(
+                        groupId = groupId,
+                        phone = phone,
+                        fullName = phone,
+                        importedFrom = "txt"
+                    )
+                )
+            }
         }
 
         return ImportResult(
