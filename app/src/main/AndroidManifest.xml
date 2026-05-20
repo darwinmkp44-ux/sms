@@ -45,5 +45,11 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <service
+            android:name=".sms.SmsSendService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

@@ -31,6 +31,8 @@ data class CampaignEntity(
     val messagesPerInterval: Int = 1,
     @ColumnInfo(name = "interval_ms")
     val intervalMs: Long = 1000L,
+    @ColumnInfo(name = "max_retries")
+    val maxRetries: Int = 3,
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "updated_at")

@@ -35,7 +35,8 @@ data class CreateCampaignUiState(
     val estimatedParts: Int = 1,
     val totalRecipients: Int = 0,
     val isLoading: Boolean = false,
-    val simSlots: List<SimInfo> = emptyList()
+    val simSlots: List<SimInfo> = emptyList(),
+    val maxRetries: Int = 3
 ) {
     val intervalMs: Long
         get() = when (intervalUnit) {
@@ -113,6 +114,10 @@ class CreateCampaignViewModel @Inject constructor(
         updateState { it.copy(intervalUnit = unit) }
     }
 
+    fun setMaxRetries(value: Int) {
+        updateState { it.copy(maxRetries = value.coerceIn(0, 15)) }
+    }
+
     fun createCampaign(onComplete: (Long) -> Unit) {
         if (uiState.value.isLoading) return
         updateState { it.copy(isLoading = true) }
@@ -127,7 +132,8 @@ class CreateCampaignViewModel @Inject constructor(
                 totalContacts = state.totalRecipients,
                 simSlot = state.simSlot,
                 messagesPerInterval = state.messagesPerIntervalInt.coerceAtLeast(1),
-                intervalMs = state.intervalMs.coerceIn(100L, 3600000L)
+                intervalMs = state.intervalMs.coerceIn(100L, 3600000L),
+                maxRetries = state.maxRetries
             )
 
             val contacts = mutableListOf<ContactEntity>()

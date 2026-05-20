@@ -1,6 +1,9 @@
 package com.disparasms.app.sms
 
+import android.content.Context
+import android.content.Intent
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.disparasms.app.data.local.entity.CampaignLogEntity
 import com.disparasms.app.data.repository.CampaignRepository
 import com.disparasms.app.util.PhoneUtils
@@ -26,6 +29,7 @@ data class SendProgress(
 )
 
 class SmsQueueManager(
+    private val context: Context,
     private val smsSender: SmsSender,
     private val campaignRepository: CampaignRepository
 ) {
@@ -68,6 +72,11 @@ class SmsQueueManager(
         val existing = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
             campaignRepository.getById(campaignId)
         }
+
+        val serviceIntent = Intent(context, SmsSendService::class.java).apply {
+            action = SmsSendService.ACTION_START
+        }
+        ContextCompat.startForegroundService(context, serviceIntent)
 
         currentJob = scope.launch {
             try {
@@ -142,12 +151,14 @@ class SmsQueueManager(
                 }
 
                 // Retry failed messages with exponential backoff
+                val maxRetries = existing?.maxRetries ?: 3
                 var retryRound = 0
-                while (retryQueue.isNotEmpty() && retryRound < MAX_FAILED_RETRIES && isActive) {
+                while (retryQueue.isNotEmpty() && retryRound < maxRetries && isActive) {
                     _progress.value = _progress.value?.copy(
-                        currentContact = "Retentativa ${retryRound + 1}/$MAX_FAILED_RETRIES (${retryQueue.size} msg)"
+                        currentContact = "Retentativa ${retryRound + 1}/$maxRetries (${retryQueue.size} msg)"
                     )
-                    delay(RETRY_BACKOFF_MS[retryRound])
+                    val backoffDelay = (5000L * Math.pow(2.0, retryRound.toDouble()).toLong()).coerceIn(5000L, 60000L)
+                    delay(backoffDelay)
 
                     val iterator = retryQueue.iterator()
                     while (iterator.hasNext()) {

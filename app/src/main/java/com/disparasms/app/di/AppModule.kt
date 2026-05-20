@@ -60,7 +60,8 @@ object AppModule {
     @Provides
     @Singleton
     fun provideSmsQueueManager(
+        @ApplicationContext context: Context,
         smsSender: SmsSender,
         campaignRepository: CampaignRepository
-    ): SmsQueueManager = SmsQueueManager(smsSender, campaignRepository)
+    ): SmsQueueManager = SmsQueueManager(context, smsSender, campaignRepository)
 }

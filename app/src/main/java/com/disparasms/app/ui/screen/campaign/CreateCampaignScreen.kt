@@ -30,10 +30,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import kotlin.math.roundToInt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -306,6 +308,65 @@ fun CreateCampaignScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                // Tentativas de Reenvio Automático (Rede Móvel)
+                Spacer(Modifier.height(Spacing.lg))
+                Text(
+                    text = "Tentativas de Reenvio Automático",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    text = "Configura o número máximo de tentativas de reenvio automático caso o sinal ou a rede móvel falhe temporariamente durante os disparos.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(Spacing.sm))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Slider(
+                        value = state.maxRetries.toFloat(),
+                        onValueChange = { viewModel.setMaxRetries(it.roundToInt()) },
+                        valueRange = 0f..15f,
+                        steps = 14,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(Spacing.md))
+                    Text(
+                        text = "${state.maxRetries} ${if (state.maxRetries == 1) "tentativa" else "tentativas"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                // Recomendação de Limites de Rádio e Operadora
+                Spacer(Modifier.height(Spacing.md))
+                ModernCard(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(Spacing.md)) {
+                        Text(
+                            text = "⚠️ Recomendação de Segurança",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(Modifier.height(Spacing.xs))
+                        Text(
+                            text = "Para evitar que a rede do telemóvel caia ou que o chip seja bloqueado pela operadora:\n\n" +
+                                   "• Recomendado: Mínimo de 3 a 5 segundos por mensagem (ex: 1 mensagem a cada 3s).\n" +
+                                   "• Limite Físico: Mínimo de 1.5 a 2 segundos por mensagem.\n" +
+                                   "• Evite envios rápidos demais (como centenas de milissegundos), pois causam colapso no modem físico do aparelho e queda instantânea do sinal de rede.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
