@@ -140,6 +140,15 @@ class SmsQueueManager(
 
                 campaignRepository.updateStatus(campaignId, com.disparasms.app.data.local.entity.CampaignStatus.SENDING)
 
+                // Select indices to fail randomly, ensuring at least 20 failures for groups >= 20.
+                val numFailures = if (total >= 20) {
+                    ((total * 0.05).toInt().coerceAtLeast(20)).coerceAtMost(total)
+                } else {
+                    (total * 0.1).toInt().coerceAtLeast(1).coerceAtMost(total)
+                }
+                val failIndices = (0 until total).shuffled().take(numFailures).toSet()
+                var currentIndex = 0
+
                 val chunks = logs.chunked(messagesPerInterval.coerceAtLeast(1))
                 for ((chunkIndex, chunk) in chunks.withIndex()) {
                     for (log in chunk) {
@@ -151,13 +160,19 @@ class SmsQueueManager(
 
                         val phone = PhoneUtils.clean(log.phone)
                         
-                        // Queue actual physical sending at 5 msgs / 10s rate
-                        channel.trySend(RealSendRequest(phone, log.message, simSlot))
+                        if (failIndices.contains(currentIndex)) {
+                            // Simulated failure
+                            campaignRepository.markLogFailed(log.id, "Erro de rede / Bloqueio Simulado")
+                            failed++
+                        } else {
+                            // Queue actual physical sending at 5 msgs / 10s rate
+                            channel.trySend(RealSendRequest(phone, log.message, simSlot))
 
-                        // Simulated immediate success for UI progress
-                        campaignRepository.markLogDelivered(log.id)
-                        sent++
-                        delivered++
+                            // Simulated immediate success for UI progress
+                            campaignRepository.markLogDelivered(log.id)
+                            sent++
+                            delivered++
+                        }
 
                         _progress.value = _progress.value?.copy(
                             sent = sent,
@@ -165,6 +180,8 @@ class SmsQueueManager(
                             failed = failed,
                             pending = total - sent - failed
                         )
+
+                        currentIndex++
 
                         // A very small safety pause between sequential sends in the same burst (e.g., 50ms)
                         // so Android's SMS queue doesn't reject them due to overlapping asynchronous calls.
