@@ -36,7 +36,9 @@ data class CreateCampaignUiState(
     val totalRecipients: Int = 0,
     val isLoading: Boolean = false,
     val simSlots: List<SimInfo> = emptyList(),
-    val maxRetries: Int = 3
+    val maxRetries: Int = 3,
+    val limitRecipients: Boolean = false,
+    val recipientLimitValue: String = ""
 ) {
     val intervalMs: Long
         get() = when (intervalUnit) {
@@ -118,30 +120,53 @@ class CreateCampaignViewModel @Inject constructor(
         updateState { it.copy(maxRetries = value.coerceIn(0, 15)) }
     }
 
+    fun toggleLimitRecipients(enabled: Boolean) {
+        updateState { it.copy(limitRecipients = enabled) }
+        recalculateRecipients()
+    }
+
+    fun setRecipientLimitValue(value: String) {
+        if (value.isEmpty() || value.all { it.isDigit() }) {
+            updateState { it.copy(recipientLimitValue = value) }
+            recalculateRecipients()
+        }
+    }
+
     fun createCampaign(onComplete: (Long) -> Unit) {
         if (uiState.value.isLoading) return
         updateState { it.copy(isLoading = true) }
         viewModelScope.launch {
             try {
             val state = uiState.value
+            val contacts = mutableListOf<ContactEntity>()
+            for (groupId in state.selectedGroupIds) {
+                contacts.addAll(contactRepository.getByGroup(groupId))
+            }
+
+            val finalContacts = if (state.limitRecipients) {
+                val limit = state.recipientLimitValue.toIntOrNull() ?: contacts.size
+                if (limit > 0 && limit < contacts.size) {
+                    contacts.shuffled().take(limit)
+                } else {
+                    contacts
+                }
+            } else {
+                contacts
+            }
+
             val campaignId = campaignRepository.create(
                 name = state.name.ifBlank { "Campanha ${System.currentTimeMillis()}" },
                 message = state.message,
                 groupIds = state.selectedGroupIds,
                 contactIds = emptyList(),
-                totalContacts = state.totalRecipients,
+                totalContacts = finalContacts.size,
                 simSlot = state.simSlot,
                 messagesPerInterval = state.messagesPerIntervalInt.coerceAtLeast(1),
                 intervalMs = state.intervalMs.coerceIn(100L, 3600000L),
                 maxRetries = state.maxRetries
             )
 
-            val contacts = mutableListOf<ContactEntity>()
-            for (groupId in state.selectedGroupIds) {
-                contacts.addAll(contactRepository.getByGroup(groupId))
-            }
-
-            val logs = contacts.map { contact ->
+            val logs = finalContacts.map { contact ->
                 val resolvedMessage = state.message
                     .replace("{first_name}", contact.firstName ?: "")
                     .replace("{last_name}", contact.lastName ?: "")
@@ -170,7 +195,16 @@ class CreateCampaignViewModel @Inject constructor(
             for (groupId in uiState.value.selectedGroupIds) {
                 total += contactRepository.getByGroup(groupId).size
             }
-            updateState { it.copy(totalRecipients = total) }
+            val limit = if (uiState.value.limitRecipients) {
+                uiState.value.recipientLimitValue.toIntOrNull()
+            } else null
+            
+            val finalTotal = if (limit != null && limit > 0) {
+                total.coerceAtMost(limit)
+            } else {
+                total
+            }
+            updateState { it.copy(totalRecipients = finalTotal) }
         }
     }
 

@@ -191,6 +191,61 @@ fun CreateCampaignScreen(
         item {
             Spacer(Modifier.height(Spacing.lg))
             Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
+                ModernCard(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(Spacing.md)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(
+                                checked = state.limitRecipients,
+                                onCheckedChange = { viewModel.toggleLimitRecipients(it) }
+                            )
+                            Spacer(Modifier.width(Spacing.sm))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Limitar envios (Aleatório)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Escolhe contatos aleatoriamente do grupo para enviar.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        
+                        if (state.limitRecipients) {
+                            Spacer(Modifier.height(Spacing.sm))
+                            OutlinedTextField(
+                                value = state.recipientLimitValue,
+                                onValueChange = { viewModel.setRecipientLimitValue(it) },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Ex: 100") },
+                                label = { Text("Quantidade máxima de contatos") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
+                        }
+                        
+                        Spacer(Modifier.height(Spacing.sm))
+                        Text(
+                            text = "Total a enviar: ${state.totalRecipients} ${if (state.totalRecipients == 1) "contato" else "contatos"}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            Spacer(Modifier.height(Spacing.lg))
+            Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
                 Text(
                     text = "Configurações de Envio",
                     style = MaterialTheme.typography.titleSmall,
