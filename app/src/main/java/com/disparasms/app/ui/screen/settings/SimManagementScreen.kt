@@ -53,7 +53,8 @@ import com.disparasms.app.ui.theme.Spacing
 fun SimManagementScreen(navController: NavController) {
     val context = LocalContext.current
     val smsSender = remember { SmsSender(context) }
-    var selectedSimSlot by remember { mutableStateOf(0) }
+    val prefs = remember { context.getSharedPreferences("disparasms_prefs", android.content.Context.MODE_PRIVATE) }
+    var selectedSimSlot by remember { mutableStateOf(prefs.getInt("default_sim_slot", 0)) }
     var simSlots by remember { mutableStateOf<List<SimInfo>>(emptyList()) }
 
     LaunchedEffect(Unit) {
@@ -106,7 +107,10 @@ fun SimManagementScreen(navController: NavController) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { selectedSimSlot = sim.slotIndex },
+                        .clickable { 
+                            selectedSimSlot = sim.slotIndex 
+                            prefs.edit().putInt("default_sim_slot", sim.slotIndex).apply()
+                        },
                     shape = RoundedCornerShape(CornerRadius.md),
                     colors = CardDefaults.cardColors(
                         containerColor = if (selectedSimSlot == sim.slotIndex)

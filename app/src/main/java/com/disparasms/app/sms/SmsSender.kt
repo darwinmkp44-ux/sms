@@ -51,11 +51,7 @@ class SmsSender(private val context: Context) {
 
     fun sendSms(phone: String, message: String, simSlot: Int = 0): SmsResult {
         return try {
-            val manager = if (simSlot > 0) {
-                getSmsManagerForSlot(simSlot)
-            } else {
-                smsManager
-            }
+            val manager = getSmsManagerForSlot(simSlot)
 
             val parts = manager.divideMessage(message)
             val sentIntents = ArrayList<android.app.PendingIntent>()
@@ -84,22 +80,29 @@ class SmsSender(private val context: Context) {
 
     private fun getSmsManagerForSlot(slotIndex: Int): SmsManager {
         try {
-            val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
                 val subscriptionManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
                     val subscriptionInfoList = subscriptionManager.activeSubscriptionInfoList
                     val targetSub = subscriptionInfoList?.getOrNull(slotIndex)
                     if (targetSub != null) {
-                        return SmsManager.getSmsManagerForSubscriptionId(targetSub.subscriptionId)
+                        return getSmsManagerForSubscriptionId(targetSub.subscriptionId)
                     }
                 }
             }
-
-            val getServiceMethod: Method = SmsManager::class.java.getMethod("getSmsManagerForSubscriptionId", Int::class.java)
-            return getServiceMethod.invoke(null, slotIndex) as SmsManager
         } catch (e: Exception) {
-            return smsManager
+            // Ignore and fallback
+        }
+        return smsManager
+    }
+
+    private fun getSmsManagerForSubscriptionId(subscriptionId: Int): SmsManager {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val baseManager = context.getSystemService(SmsManager::class.java)
+            baseManager.createForSubscriptionId(subscriptionId)
+        } else {
+            @Suppress("DEPRECATION")
+            SmsManager.getSmsManagerForSubscriptionId(subscriptionId)
         }
     }
 

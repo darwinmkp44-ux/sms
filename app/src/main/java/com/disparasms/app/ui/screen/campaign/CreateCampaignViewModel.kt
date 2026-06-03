@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 
 enum class DelayUnit { MS, S }
 
@@ -55,7 +57,8 @@ class CreateCampaignViewModel @Inject constructor(
     private val groupRepository: GroupRepository,
     private val contactRepository: ContactRepository,
     private val campaignRepository: CampaignRepository,
-    private val smsSender: SmsSender
+    private val smsSender: SmsSender,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val uiState: StateFlow<CreateCampaignUiState> = MutableStateFlow(CreateCampaignUiState())
@@ -68,9 +71,12 @@ class CreateCampaignViewModel @Inject constructor(
         viewModelScope.launch {
             val groups = groupRepository.getAll()
             val sims = smsSender.getAvailableSimSlots()
+            val prefs = context.getSharedPreferences("disparasms_prefs", Context.MODE_PRIVATE)
+            val defaultSim = prefs.getInt("default_sim_slot", 0)
             (uiState as MutableStateFlow).value = uiState.value.copy(
                 groups = groups,
-                simSlots = sims
+                simSlots = sims,
+                simSlot = defaultSim.coerceIn(0, sims.size - 1)
             )
         }
     }

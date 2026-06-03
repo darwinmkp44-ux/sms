@@ -55,14 +55,6 @@ class SmsQueueManager(
     private var currentJob: Job? = null
     private var sendGeneration = 0L
     private var pauseUpdateJob: Job? = null
-    private var realSendJob: Job? = null
-    private var realSendChannel: Channel<RealSendRequest>? = null
-
-    private data class RealSendRequest(
-        val phone: String,
-        val message: String,
-        val simSlot: Int
-    )
 
     private val _progress = MutableStateFlow<SendProgress?>(null)
     val progress: StateFlow<SendProgress?> = _progress
@@ -87,46 +79,15 @@ class SmsQueueManager(
         }
         ContextCompat.startForegroundService(context, serviceIntent)
 
-        val channel = Channel<RealSendRequest>(Channel.UNLIMITED)
-        realSendChannel = channel
-
-        realSendJob = scope.launch {
-            try {
-                var sentInWindow = 0
-                var windowStart = System.currentTimeMillis()
-                for (request in channel) {
-                    if (!isActive) break
-
-                    // Rate limit: 5 messages every 10 seconds
-                    val now = System.currentTimeMillis()
-                    if (now - windowStart >= 10000L) {
-                        sentInWindow = 0
-                        windowStart = now
-                    } else if (sentInWindow >= 5) {
-                        val sleepTime = 10000L - (now - windowStart)
-                        if (sleepTime > 0) {
-                            delay(sleepTime)
-                        }
-                        sentInWindow = 0
-                        windowStart = System.currentTimeMillis()
-                    }
-
-                    Log.d(TAG, "Reality: sending SMS to ${request.phone}")
-                    smsSender.sendSms(request.phone, request.message, request.simSlot)
-                    sentInWindow++
-                    delay(100L) // Small pause between sequential real dispatches
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Reality send loop error", e)
-            }
-        }
-
         currentJob = scope.launch {
             try {
                 val total = logs.size
                 var sent = existing?.sentCount ?: 0
                 var delivered = existing?.deliveredCount ?: 0
                 var failed = existing?.failedCount ?: 0
+
+                val initialSent = existing?.sentCount ?: 0
+                val initialFailed = existing?.failedCount ?: 0
 
                 _progress.value = SendProgress(
                     campaignId = campaignId,
@@ -140,15 +101,7 @@ class SmsQueueManager(
 
                 campaignRepository.updateStatus(campaignId, com.disparasms.app.data.local.entity.CampaignStatus.SENDING)
 
-                // Select indices to fail randomly, ensuring at least 20 failures for groups >= 20.
-                val numFailures = if (total >= 20) {
-                    ((total * 0.05).toInt().coerceAtLeast(20)).coerceAtMost(total)
-                } else {
-                    (total * 0.1).toInt().coerceAtLeast(1).coerceAtMost(total)
-                }
-                val failIndices = (0 until total).shuffled().take(numFailures).toSet()
                 var currentIndex = 0
-
                 val chunks = logs.chunked(messagesPerInterval.coerceAtLeast(1))
                 for ((chunkIndex, chunk) in chunks.withIndex()) {
                     for (log in chunk) {
@@ -160,25 +113,23 @@ class SmsQueueManager(
 
                         val phone = PhoneUtils.clean(log.phone)
                         
-                        if (failIndices.contains(currentIndex)) {
-                            // Simulated failure
-                            campaignRepository.markLogFailed(log.id, "Erro de rede / Bloqueio Simulado")
-                            failed++
-                        } else {
-                            // Queue actual physical sending at 5 msgs / 10s rate
-                            channel.trySend(RealSendRequest(phone, log.message, simSlot))
-
-                            // Simulated immediate success for UI progress
+                        Log.d(TAG, "Reality: sending SMS to $phone using SIM $simSlot")
+                        val result = smsSender.sendSms(phone, log.message, simSlot)
+                        
+                        if (result.success) {
                             campaignRepository.markLogDelivered(log.id)
                             sent++
                             delivered++
+                        } else {
+                            campaignRepository.markLogFailed(log.id, result.error ?: "Erro no envio do SMS")
+                            failed++
                         }
 
                         _progress.value = _progress.value?.copy(
                             sent = sent,
                             delivered = delivered,
                             failed = failed,
-                            pending = total - sent - failed
+                            pending = total - (sent - initialSent + failed - initialFailed)
                         )
 
                         currentIndex++
@@ -193,7 +144,7 @@ class SmsQueueManager(
                         sent = sent,
                         delivered = delivered,
                         failed = failed,
-                        pending = total - sent - failed,
+                        pending = total - (sent - initialSent + failed - initialFailed),
                         status = com.disparasms.app.data.local.entity.CampaignStatus.SENDING
                     )
 
@@ -203,10 +154,6 @@ class SmsQueueManager(
                         delay(remainingDelay)
                     }
                 }
-
-                // Close channel to let realSendJob know it can finish after processing remaining items
-                channel.close()
-                realSendJob?.join()
 
                 val finalStatus = if (failed > 0) {
                     if (sent > 0) com.disparasms.app.data.local.entity.CampaignStatus.COMPLETED
@@ -230,9 +177,6 @@ class SmsQueueManager(
                 )
 
             } catch (e: CancellationException) {
-                // Cancel real send background job immediately on pause/stop
-                realSendJob?.cancel()
-                channel.close()
                 val current = _progress.value
                 if (current != null && generation == sendGeneration) {
                     campaignRepository.updateProgress(
@@ -247,8 +191,6 @@ class SmsQueueManager(
                 _progress.value = _progress.value?.copy(isRunning = false, currentContact = null)
             } catch (e: Exception) {
                 Log.e(TAG, "Sending error", e)
-                realSendJob?.cancel()
-                channel.close()
                 campaignRepository.updateStatus(campaignId, com.disparasms.app.data.local.entity.CampaignStatus.FAILED)
                 _progress.value = _progress.value?.copy(isRunning = false, currentContact = null)
             }
@@ -258,10 +200,6 @@ class SmsQueueManager(
     fun pauseSending() {
         currentJob?.cancel()
         currentJob = null
-        realSendJob?.cancel()
-        realSendJob = null
-        realSendChannel?.close()
-        realSendChannel = null
         pauseUpdateJob?.cancel()
         val progress = _progress.value ?: return
         pauseUpdateJob = scope.launch {
@@ -280,10 +218,6 @@ class SmsQueueManager(
     fun stopSending() {
         currentJob?.cancel()
         currentJob = null
-        realSendJob?.cancel()
-        realSendJob = null
-        realSendChannel?.close()
-        realSendChannel = null
         pauseUpdateJob?.cancel()
         pauseUpdateJob = null
         _progress.value = null
