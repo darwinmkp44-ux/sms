@@ -104,4 +104,40 @@ class CampaignRepository(
 
     fun observeLogCountByStatus(campaignId: Long, status: String): Flow<Int> =
         campaignLogDao.observeCountByCampaignAndStatus(campaignId, status)
+
+    fun observeAllLogsWithCampaign(): Flow<List<com.disparasms.app.data.local.entity.CampaignLogWithCampaign>> =
+        campaignLogDao.observeAllWithCampaign()
+
+    suspend fun retryFailedLog(logId: Long) {
+        val log = campaignLogDao.getById(logId) ?: return
+        if (log.status == com.disparasms.app.data.local.entity.CampaignLogStatus.FAILED) {
+            campaignLogDao.updateStatusAndError(logId, com.disparasms.app.data.local.entity.CampaignLogStatus.PENDING, null)
+            val campaign = campaignDao.getById(log.campaignId) ?: return
+            campaignDao.updateProgress(
+                id = campaign.id,
+                sent = campaign.sentCount,
+                delivered = campaign.deliveredCount,
+                failed = (campaign.failedCount - 1).coerceAtLeast(0),
+                pending = campaign.pendingCount + 1,
+                status = com.disparasms.app.data.local.entity.CampaignStatus.PAUSED
+            )
+        }
+    }
+
+    suspend fun retryAllFailedLogs(campaignId: Long) {
+        val failedLogs = campaignLogDao.getByCampaignAndStatus(campaignId, com.disparasms.app.data.local.entity.CampaignLogStatus.FAILED)
+        if (failedLogs.isNotEmpty()) {
+            campaignLogDao.resetFailedLogsToPending(campaignId)
+            val campaign = campaignDao.getById(campaignId) ?: return
+            val count = failedLogs.size
+            campaignDao.updateProgress(
+                id = campaignId,
+                sent = campaign.sentCount,
+                delivered = campaign.deliveredCount,
+                failed = (campaign.failedCount - count).coerceAtLeast(0),
+                pending = campaign.pendingCount + count,
+                status = com.disparasms.app.data.local.entity.CampaignStatus.PAUSED
+            )
+        }
+    }
 }

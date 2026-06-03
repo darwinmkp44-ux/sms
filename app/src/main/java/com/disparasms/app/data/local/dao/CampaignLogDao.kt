@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.disparasms.app.data.local.entity.CampaignLogEntity
+import com.disparasms.app.data.local.entity.CampaignLogWithCampaign
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -36,6 +37,30 @@ interface CampaignLogDao {
 
     @Query("UPDATE campaign_logs SET status = :status, error_message = :error WHERE id = :id")
     suspend fun markFailed(id: Long, status: String, error: String?)
+
+    @Query("UPDATE campaign_logs SET status = :status, error_message = :error WHERE id = :id")
+    suspend fun updateStatusAndError(id: Long, status: String, error: String?)
+
+    @Query("UPDATE campaign_logs SET status = 'PENDING', error_message = NULL WHERE campaign_id = :campaignId AND status = 'FAILED'")
+    suspend fun resetFailedLogsToPending(campaignId: Long)
+
+    @Query("""
+        SELECT 
+            l.id as logId, 
+            l.campaign_id as campaignId, 
+            c.name as campaignName, 
+            l.phone as phone, 
+            l.first_name as firstName, 
+            l.message as message, 
+            l.status as status, 
+            l.error_message as errorMessage, 
+            l.sent_at as sentAt, 
+            l.delivered_at as deliveredAt
+        FROM campaign_logs l
+        INNER JOIN campaigns c ON l.campaign_id = c.id
+        ORDER BY l.id DESC
+    """)
+    fun observeAllWithCampaign(): Flow<List<CampaignLogWithCampaign>>
 
     @Query("UPDATE campaign_logs SET status = :status, delivered_at = :deliveredAt WHERE id = :id")
     suspend fun markDelivered(id: Long, status: String, deliveredAt: Long = System.currentTimeMillis())

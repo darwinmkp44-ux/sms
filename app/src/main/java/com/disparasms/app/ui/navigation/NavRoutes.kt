@@ -4,10 +4,12 @@ sealed class NavRoutes(val route: String) {
     // Bottom nav destinations
     data object Home : NavRoutes("home")
     data object Groups : NavRoutes("groups")
-    data object Campaigns : NavRoutes("campaigns")
+    data object Messages : NavRoutes("messages")
+    data object Tools : NavRoutes("tools")
     data object Settings : NavRoutes("settings")
 
     // Sub destinations
+    data object Campaigns : NavRoutes("campaigns")
     data object CreateGroup : NavRoutes("groups/create")
     data object EditGroup : NavRoutes("groups/edit/{groupId}") {
         fun createRoute(groupId: Long) = "groups/edit/$groupId"
@@ -31,4 +33,10 @@ sealed class NavRoutes(val route: String) {
     data object BackupRestore : NavRoutes("settings/backup")
     data object SimManagement : NavRoutes("settings/sim")
     data object About : NavRoutes("settings/about")
+
+    // Tools sub destinations
+    data object ToolsNumberCleaner : NavRoutes("tools/number-cleaner")
+    data object ToolsTemplates : NavRoutes("tools/templates")
+    data object ToolsQuickTest : NavRoutes("tools/quick-test")
+    data object ToolsReports : NavRoutes("tools/reports")
 }

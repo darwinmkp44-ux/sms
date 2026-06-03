@@ -37,6 +37,7 @@ object AppModule {
     @Provides fun provideContactDao(db: AppDatabase): ContactDao = db.contactDao()
     @Provides fun provideCampaignDao(db: AppDatabase): CampaignDao = db.campaignDao()
     @Provides fun provideCampaignLogDao(db: AppDatabase): CampaignLogDao = db.campaignLogDao()
+    @Provides fun provideMessageTemplateDao(db: AppDatabase): com.disparasms.app.data.local.dao.MessageTemplateDao = db.messageTemplateDao()
 
     @Provides
     @Singleton
@@ -45,6 +46,11 @@ object AppModule {
     @Provides
     @Singleton
     fun provideContactRepository(contactDao: ContactDao): ContactRepository = ContactRepository(contactDao)
+
+    @Provides
+    @Singleton
+    fun provideMessageTemplateRepository(messageTemplateDao: com.disparasms.app.data.local.dao.MessageTemplateDao): com.disparasms.app.data.repository.MessageTemplateRepository =
+        com.disparasms.app.data.repository.MessageTemplateRepository(messageTemplateDao)
 
     @Provides
     @Singleton

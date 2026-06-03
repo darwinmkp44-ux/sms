@@ -10,10 +10,14 @@ import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.House
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.House
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Sms
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -47,6 +51,12 @@ import com.disparasms.app.ui.screen.settings.AboutScreen
 import com.disparasms.app.ui.screen.settings.BackupRestoreScreen
 import com.disparasms.app.ui.screen.settings.SimManagementScreen
 import com.disparasms.app.ui.screen.import.ImportScreen
+import com.disparasms.app.ui.screen.messages.MessagesScreen
+import com.disparasms.app.ui.screen.tools.ToolsScreen
+import com.disparasms.app.ui.screen.tools.NumberCleanerScreen
+import com.disparasms.app.ui.screen.tools.TemplatesScreen
+import com.disparasms.app.ui.screen.tools.QuickTestScreen
+import com.disparasms.app.ui.screen.tools.ReportsScreen
 
 private const val ANIM_DURATION = 250
 
@@ -60,7 +70,8 @@ data class BottomNavItem(
 val bottomNavItems = listOf(
     BottomNavItem("Início", NavRoutes.Home.route, Icons.Filled.House, Icons.Outlined.House),
     BottomNavItem("Grupos", NavRoutes.Groups.route, Icons.Filled.Campaign, Icons.Outlined.Campaign),
-    BottomNavItem("Campanhas", NavRoutes.Campaigns.route, Icons.Filled.History, Icons.Outlined.History),
+    BottomNavItem("Mensagens", NavRoutes.Messages.route, Icons.Filled.Sms, Icons.Outlined.Sms),
+    BottomNavItem("Ferramentas", NavRoutes.Tools.route, Icons.Filled.Build, Icons.Outlined.Build),
     BottomNavItem("Definições", NavRoutes.Settings.route, Icons.Filled.Settings, Icons.Outlined.Settings)
 )
 
@@ -129,11 +140,34 @@ fun AppNavigation() {
             composable(NavRoutes.Groups.route) {
                 GroupsScreen(navController = navController)
             }
-            composable(NavRoutes.Campaigns.route) {
-                CampaignHistoryScreen(navController = navController)
+            composable(NavRoutes.Messages.route) {
+                MessagesScreen(navController = navController)
+            }
+            composable(NavRoutes.Tools.route) {
+                ToolsScreen(navController = navController)
             }
             composable(NavRoutes.Settings.route) {
                 SettingsScreen(navController = navController)
+            }
+
+            // Campaigns sub-routes
+            composable(NavRoutes.Campaigns.route) {
+                CampaignHistoryScreen(navController = navController)
+            }
+            composable(NavRoutes.CreateCampaign.route) {
+                CreateCampaignScreen(navController = navController)
+            }
+            composable(
+                route = NavRoutes.CampaignDetail.route,
+                arguments = listOf(navArgument("campaignId") { type = NavType.LongType })
+            ) {
+                CampaignDetailScreen(navController = navController)
+            }
+            composable(
+                route = NavRoutes.CampaignLogs.route,
+                arguments = listOf(navArgument("campaignId") { type = NavType.LongType })
+            ) {
+                CampaignLogsScreen(navController = navController)
             }
 
             // Groups sub-routes
@@ -151,23 +185,6 @@ fun AppNavigation() {
                 arguments = listOf(navArgument("groupId") { type = NavType.LongType })
             ) {
                 GroupDetailScreen(navController = navController)
-            }
-
-            // Campaigns sub-routes
-            composable(NavRoutes.CreateCampaign.route) {
-                CreateCampaignScreen(navController = navController)
-            }
-            composable(
-                route = NavRoutes.CampaignDetail.route,
-                arguments = listOf(navArgument("campaignId") { type = NavType.LongType })
-            ) {
-                CampaignDetailScreen(navController = navController)
-            }
-            composable(
-                route = NavRoutes.CampaignLogs.route,
-                arguments = listOf(navArgument("campaignId") { type = NavType.LongType })
-            ) {
-                CampaignLogsScreen(navController = navController)
             }
 
             // Settings sub-routes
@@ -198,6 +215,20 @@ fun AppNavigation() {
                 val groupId = backStackEntry.arguments?.getLong("groupId", -1L)
                     ?.takeIf { it != -1L }
                 ImportScreen(navController = navController, groupId = groupId)
+            }
+
+            // Tools sub-routes
+            composable(NavRoutes.ToolsNumberCleaner.route) {
+                NumberCleanerScreen(navController = navController)
+            }
+            composable(NavRoutes.ToolsTemplates.route) {
+                TemplatesScreen(navController = navController)
+            }
+            composable(NavRoutes.ToolsQuickTest.route) {
+                QuickTestScreen(navController = navController)
+            }
+            composable(NavRoutes.ToolsReports.route) {
+                ReportsScreen(navController = navController)
             }
         }
     }
